@@ -3,6 +3,20 @@ import * as crypto from 'crypto';
 
 const BASE_URL = 'https://www.ecfr.gov';
 
+interface TitleWithDate {
+  titleData: TitleData & {
+    dbId: number;
+    up_to_date_as_of?: string;
+    latest_issue_date?: string;
+    latest_amended_on?: string
+  };
+  agency: {
+    id: number;
+    name: string;
+    slug: string;
+  };
+}
+
 interface AgencyData {
   name: string;
   description?: string;
@@ -199,61 +213,72 @@ async function ingestData() {
 
   // Log title count per agency for debugging
   const titleCountByAgency: Record<string, number> = {};
+  const titlesWithDates: TitleWithDate[] = [];
 
   for (const titleData of filteredTitlesData) {
-    // Find which agency(ies) reference this title
-    let assignedAgency = null;
+    // Find ALL agencies that reference this title and create entries for each
+    const candidateAgencies = [];
 
     for (const [agencySlug, titleNumbers] of agencyTitleMap.entries()) {
       if (titleNumbers.includes(titleData.number)) {
-        assignedAgency = createdAgencies.find(a => a.slug === agencySlug);
-        break; // Assign to first matching agency if multiple agencies reference the same title
+        const agency = createdAgencies.find(a => a.slug === agencySlug);
+        if (agency) {
+          candidateAgencies.push(agency);
+        }
       }
     }
 
-    if (assignedAgency) {
-      titleCountByAgency[assignedAgency.name] = (titleCountByAgency[assignedAgency.name] || 0) + 1;
+    // Create title entries for ALL agencies that reference this CFR title
+    for (const agency of candidateAgencies) {
+      titleCountByAgency[agency.name] = (titleCountByAgency[agency.name] || 0) + 1;
 
-      await prisma.title.upsert({
-        where: { code: titleData.number.toString() },
+      console.log(`Creating CFR Title ${titleData.number} entry for ${agency.name}`);
+
+      // Use a composite key that includes agency to allow shared titles
+      const titleKey = `${titleData.number}-${agency.slug}`;
+
+      const createdTitle = await prisma.title.upsert({
+        where: { code: titleKey },
         update: { name: titleData.name },
         create: {
-          code: titleData.number.toString(),
-          name: titleData.name,
-          agencyId: assignedAgency.id,
+          code: titleKey,
+          name: `${titleData.name} (${agency.name})`,
+          agencyId: agency.id,
         },
+      });
+
+      // Store title data with date info for later processing
+      titlesWithDates.push({
+        titleData: { ...titleData, dbId: createdTitle.id },
+        agency: agency
       });
     }
   }
 
   console.log('Titles per agency:', titleCountByAgency);
 
-  // For each title we just processed, fetch latest data
-  const titles = await prisma.title.findMany({
-    where: {
-      agencyId: {
-        in: createdAgencies.map(agency => agency.id)
-      }
+  console.log(`Fetching content for ${titlesWithDates.length} titles with their latest available dates...`);
+
+  for (const { titleData } of titlesWithDates) {
+    // Use the most recent date available from the title data
+    const latestDate = titleData.up_to_date_as_of || titleData.latest_issue_date || titleData.latest_amended_on;
+
+    if (!latestDate) {
+      console.log(`No date information available for title ${titleData.number}, skipping...`);
+      continue;
     }
-  });
 
-  console.log(`Fetching content for ${titles.length} titles that belong to our selected agencies...`);
-
-  for (const title of titles) {
-    // Use the latest available date from the API
-    const date = '2025-08-27';
-
-    console.log(`Fetching data for title ${title.code} on ${date}...`);
+    console.log(`Fetching data for title ${titleData.number} on ${latestDate}...`);
 
     try {
-      const structure = await fetchStructure(title.code, date);
-      const content = await fetchContent(title.code, date);
+      const structure = await fetchStructure(titleData.number.toString(), latestDate);
+      const content = await fetchContent(titleData.number.toString(), latestDate);
 
       const version = await prisma.version.upsert({
         where: {
           titleId_date: {
-            titleId: title.id,
-            date: new Date(date),
+            titleId: titleData.dbId,
+            date: new Date(latestDate),
           },
         },
         update: {
@@ -261,8 +286,8 @@ async function ingestData() {
           contentXml: content,
         },
         create: {
-          titleId: title.id,
-          date: new Date(date),
+          titleId: titleData.dbId,
+          date: new Date(latestDate),
           structureJson: structure,
           contentXml: content,
         },
@@ -300,7 +325,7 @@ async function ingestData() {
         });
       }
     } catch (error) {
-      console.error(`Error fetching data for title ${title.code}:`, error);
+      console.error(`Error fetching data for title ${titleData.number}:`, error);
     }
   }
 
