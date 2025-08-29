@@ -29,7 +29,7 @@ interface RawAgency {
   short_name: string;
   display_name: string;
   sortable_name: string;
-  children: unknown[];
+  children: RawAgency[];
   cfr_references: { title: number; chapter: string }[];
 }
 
@@ -119,27 +119,52 @@ function calculateChecksum(text: string): string {
   return crypto.createHash('md5').update(text).digest('hex');
 }
 
-async function ingestData() {
+async function ingestData(maxAgencies?: number) {
   console.log('Fetching agencies...');
 
   // Get all agencies from the API
   const allAgencies = await fetchAgencies();
 
   // Filter for agencies that have CFR references (indicate regulatory activity)
-  const agenciesWithCFR = allAgencies.filter(agency =>
+  let agenciesWithCFR = allAgencies.filter(agency =>
     agency.cfr_references && agency.cfr_references.length > 0
   );
+
+  // Limit agencies if maxAgencies is specified
+  if (maxAgencies && maxAgencies > 0) {
+    agenciesWithCFR = agenciesWithCFR.slice(0, maxAgencies);
+    console.log(`Limited to ${maxAgencies} agencies for testing`);
+  }
 
   console.log(`Found ${agenciesWithCFR.length} agencies with CFR references out of ${allAgencies.length} total agencies`);
 
   // Create agencies in database and get their IDs
+  // First pass: create all agencies without parent relationships
   const createdAgencies = [];
   const agencyTitleMap = new Map<string, number[]>(); // Map agency slug to their CFR title numbers
+  const agencySlugToId = new Map<string, number>(); // Map for parent relationship resolution
 
-  for (const rawAgency of agenciesWithCFR) {
+  // Flatten all agencies (parent + children) that have CFR references
+  const flatAgencies: RawAgency[] = [];
+
+  for (const agency of agenciesWithCFR) {
+    flatAgencies.push(agency);
+    // Add children if they have CFR references
+    for (const child of agency.children) {
+      if (child.cfr_references && child.cfr_references.length > 0) {
+        flatAgencies.push(child);
+      }
+    }
+  }
+
+  // First pass: Create all agencies
+  for (const rawAgency of flatAgencies) {
     const createdAgency = await prisma.agency.upsert({
       where: { slug: rawAgency.slug },
-      update: { name: rawAgency.name, description: rawAgency.short_name },
+      update: {
+        name: rawAgency.name,
+        description: rawAgency.short_name
+      },
       create: {
         name: rawAgency.name,
         description: rawAgency.short_name,
@@ -147,11 +172,30 @@ async function ingestData() {
       },
     });
     createdAgencies.push(createdAgency);
+    agencySlugToId.set(rawAgency.slug, createdAgency.id);
 
     // Get CFR title references for this agency
     const titleNumbers = rawAgency.cfr_references?.map((ref: { title: number; chapter: string }) => ref.title) || [];
     agencyTitleMap.set(rawAgency.slug, titleNumbers);
     console.log(`${rawAgency.name} references CFR titles: ${titleNumbers.join(', ')}`);
+  }
+
+  // Second pass: Update parent relationships
+  for (const parentAgency of agenciesWithCFR) {
+    for (const childAgency of parentAgency.children) {
+      if (childAgency.cfr_references && childAgency.cfr_references.length > 0) {
+        const childId = agencySlugToId.get(childAgency.slug);
+        const parentId = agencySlugToId.get(parentAgency.slug);
+
+        if (childId && parentId) {
+          await prisma.agency.update({
+            where: { id: childId },
+            data: { parentId: parentId },
+          });
+          console.log(`Set ${childAgency.name} as child of ${parentAgency.name}`);
+        }
+      }
+    }
   }
 
   console.log('Fetching titles...');
@@ -368,4 +412,31 @@ async function ingestData() {
   console.log('Ingestion complete.');
 }
 
-ingestData().catch(console.error);
+// Parse command line arguments
+const args = process.argv.slice(2);
+const maxAgenciesArg = args.find(arg => arg.startsWith('--max-agencies='));
+const maxAgencies = maxAgenciesArg ? parseInt(maxAgenciesArg.split('=')[1]) : undefined;
+
+// Show usage if help is requested
+if (args.includes('--help') || args.includes('-h')) {
+  console.log(`
+Usage: npm run ingest [options]
+
+Options:
+  --max-agencies=N    Limit ingestion to N agencies (for testing)
+  --help, -h          Show this help message
+
+Examples:
+  npm run ingest                    # Ingest all agencies
+  npm run ingest -- --max-agencies=2    # Ingest only 2 agencies for testing
+  `);
+  process.exit(0);
+}
+
+if (maxAgencies) {
+  console.log(`Running in test mode with maximum ${maxAgencies} agencies`);
+} else {
+  console.log('Running full ingestion for all agencies');
+}
+
+ingestData(maxAgencies).catch(console.error);
