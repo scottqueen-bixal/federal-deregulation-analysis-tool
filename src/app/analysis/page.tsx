@@ -48,7 +48,6 @@ interface CrossCuttingData {
 export default function Analysis() {
   const [agencies, setAgencies] = useState<Agency[]>([]);
   const [selectedAgency, setSelectedAgency] = useState<number | null>(null);
-  const [date, setDate] = useState('');
   const [analysisData, setAnalysisData] = useState<AnalysisData>({});
   const [crossCuttingData, setCrossCuttingData] = useState<CrossCuttingData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -79,7 +78,7 @@ export default function Analysis() {
 
     setLoading(true);
     try {
-      const url = `/api/analysis/${endpoint}/agency/${selectedAgency}${date ? `?date=${date}` : ''}`;
+      const url = `/api/analysis/${endpoint}/agency/${selectedAgency}`;
       const res = await fetch(url);
       const data = await res.json();
       setAnalysisData(prev => ({ ...prev, ...data }));
@@ -88,12 +87,6 @@ export default function Analysis() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const fetchAll = () => {
-    fetchAnalysis('word_count');
-    fetchAnalysis('checksum');
-    fetchAnalysis('complexity_score');
   };
 
   const fetchCrossCuttingData = async (agencyId: number) => {
@@ -121,6 +114,9 @@ export default function Analysis() {
                 setSelectedAgency(agencyId);
                 if (agencyId) {
                   fetchCrossCuttingData(agencyId);
+                  fetchAnalysis('word_count');
+                  fetchAnalysis('checksum');
+                  fetchAnalysis('complexity_score');
                 }
               }}
               className="w-full p-2 border border-gray-300 rounded-md"
@@ -136,24 +132,6 @@ export default function Analysis() {
               ))}
             </select>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Date (optional)</label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="p-2 border border-gray-300 rounded-md"
-            />
-          </div>
-
-          <button
-            onClick={fetchAll}
-            disabled={!selectedAgency || loading}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-          >
-            {loading ? 'Loading...' : 'Analyze'}
-          </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
