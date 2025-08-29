@@ -3,7 +3,7 @@ import { prisma } from '../../../../../../lib/prisma';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { agencyId: string } }
+  { params }: { params: Promise<{ agencyId: string }> }
 ) {
   const { searchParams } = new URL(request.url);
   const from = searchParams.get('from');
@@ -14,7 +14,8 @@ export async function GET(
   }
 
   try {
-    const agencyId = parseInt(params.agencyId);
+    const resolvedParams = await params;
+    const agencyId = parseInt(resolvedParams.agencyId);
 
     // Get sections for 'from' date
     const fromSections = await prisma.section.findMany({

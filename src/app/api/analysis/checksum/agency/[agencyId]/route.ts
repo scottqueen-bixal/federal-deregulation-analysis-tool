@@ -4,13 +4,14 @@ import * as crypto from 'crypto';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { agencyId: string } }
+  { params }: { params: Promise<{ agencyId: string }> }
 ) {
   const { searchParams } = new URL(request.url);
   const date = searchParams.get('date');
 
   try {
-    const agencyId = parseInt(params.agencyId);
+    const resolvedParams = await params;
+    const agencyId = parseInt(resolvedParams.agencyId);
     const where: {
       title?: { agencyId: number };
       date?: Date;
