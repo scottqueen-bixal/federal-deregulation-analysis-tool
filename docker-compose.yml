@@ -29,6 +29,7 @@ services:
       - .env
     environment:
       - NODE_ENV=development
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/ecfr
     depends_on:
       postgres:
         condition: service_healthy
@@ -36,7 +37,7 @@ services:
       - .:/app
       - /app/node_modules
       - /app/.next
-    command: sh -c "./entrypoint.sh"
+    command: bash -c "ls -la entrypoint.sh && bash entrypoint.sh"
     stdin_open: true
     tty: true
 

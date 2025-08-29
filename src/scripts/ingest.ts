@@ -139,32 +139,13 @@ async function ingestData(maxAgencies?: number) {
   console.log(`Found ${agenciesWithCFR.length} agencies with CFR references out of ${allAgencies.length} total agencies`);
 
   // Create agencies in database and get their IDs
-  // First pass: create all agencies without parent relationships
   const createdAgencies = [];
   const agencyTitleMap = new Map<string, number[]>(); // Map agency slug to their CFR title numbers
-  const agencySlugToId = new Map<string, number>(); // Map for parent relationship resolution
 
-  // Flatten all agencies (parent + children) that have CFR references
-  const flatAgencies: RawAgency[] = [];
-
-  for (const agency of agenciesWithCFR) {
-    flatAgencies.push(agency);
-    // Add children if they have CFR references
-    for (const child of agency.children) {
-      if (child.cfr_references && child.cfr_references.length > 0) {
-        flatAgencies.push(child);
-      }
-    }
-  }
-
-  // First pass: Create all agencies
-  for (const rawAgency of flatAgencies) {
+  for (const rawAgency of agenciesWithCFR) {
     const createdAgency = await prisma.agency.upsert({
       where: { slug: rawAgency.slug },
-      update: {
-        name: rawAgency.name,
-        description: rawAgency.short_name
-      },
+      update: { name: rawAgency.name, description: rawAgency.short_name },
       create: {
         name: rawAgency.name,
         description: rawAgency.short_name,
@@ -172,33 +153,12 @@ async function ingestData(maxAgencies?: number) {
       },
     });
     createdAgencies.push(createdAgency);
-    agencySlugToId.set(rawAgency.slug, createdAgency.id);
 
     // Get CFR title references for this agency
     const titleNumbers = rawAgency.cfr_references?.map((ref: { title: number; chapter: string }) => ref.title) || [];
     agencyTitleMap.set(rawAgency.slug, titleNumbers);
     console.log(`${rawAgency.name} references CFR titles: ${titleNumbers.join(', ')}`);
-  }
-
-  // Second pass: Update parent relationships
-  for (const parentAgency of agenciesWithCFR) {
-    for (const childAgency of parentAgency.children) {
-      if (childAgency.cfr_references && childAgency.cfr_references.length > 0) {
-        const childId = agencySlugToId.get(childAgency.slug);
-        const parentId = agencySlugToId.get(parentAgency.slug);
-
-        if (childId && parentId) {
-          await prisma.agency.update({
-            where: { id: childId },
-            data: { parentId: parentId },
-          });
-          console.log(`Set ${childAgency.name} as child of ${parentAgency.name}`);
-        }
-      }
-    }
-  }
-
-  console.log('Fetching titles...');
+  }  console.log('Fetching titles...');
   const titlesData = await fetchTitles();
 
   // Get all title numbers that are referenced by our selected agencies
@@ -289,9 +249,9 @@ async function ingestData(maxAgencies?: number) {
   console.log('\nCFR Titles by Cross-Agency Impact:');
   titlesByImpact.forEach(([titleNum, agencies]) => {
     const titleInfo = filteredTitlesData.find(t => t.number === titleNum);
-    const impactLevel = agencies.length >= 4 ? '🔴 HIGH IMPACT' :
-                       agencies.length >= 3 ? '🟡 MEDIUM IMPACT' :
-                       '🟢 SINGLE AGENCY';
+    const impactLevel = agencies.length >= 4 ? 'HIGH IMPACT' :
+                       agencies.length >= 3 ? 'MEDIUM IMPACT' :
+                       'SINGLE AGENCY';
 
     console.log(`  ${impactLevel} CFR Title ${titleNum}: ${titleInfo?.name}`);
     console.log(`    └─ Affects ${agencies.length} agencies: ${agencies.join(', ')}`);
@@ -303,15 +263,15 @@ async function ingestData(maxAgencies?: number) {
   const singleAgencyTitles = titlesByImpact.filter(([, agencies]) => agencies.length <= 2);
 
   console.log('\n=== REGULATORY IMPACT SUMMARY ===');
-  console.log(`📊 Total CFR Titles Analyzed: ${titlesByImpact.length}`);
-  console.log(`🔴 High Impact (4+ agencies): ${highImpactTitles.length} titles`);
-  console.log(`🟡 Medium Impact (3 agencies): ${mediumImpactTitles.length} titles`);
-  console.log(`🟢 Single/Low Impact (≤2 agencies): ${singleAgencyTitles.length} titles`);
+  console.log(`Total CFR Titles Analyzed: ${titlesByImpact.length}`);
+  console.log(`High Impact (4+ agencies): ${highImpactTitles.length} titles`);
+  console.log(`Medium Impact (3 agencies): ${mediumImpactTitles.length} titles`);
+  console.log(`Single/Low Impact (≤2 agencies): ${singleAgencyTitles.length} titles`);
 
   const totalTitleInstances = Array.from(titleAgencyMap.values())
     .reduce((sum, agencies) => sum + agencies.length, 0);
-  console.log(`📈 Total Title-Agency Relationships: ${totalTitleInstances}`);
-  console.log(`🔄 Average Agencies per Title: ${(totalTitleInstances / titlesByImpact.length).toFixed(1)}`);
+  console.log(`Total Title-Agency Relationships: ${totalTitleInstances}`);
+  console.log(`Average Agencies per Title: ${(totalTitleInstances / titlesByImpact.length).toFixed(1)}`);
   console.log('================================================\n');
 
   // Group titles by unique CFR number to avoid duplicate fetching

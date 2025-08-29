@@ -17,9 +17,6 @@ model Agency {
   name        String
   description String?
   slug        String  @unique
-  parentId    Int?
-  parent      Agency? @relation("AgencyHierarchy", fields: [parentId], references: [id])
-  children    Agency[] @relation("AgencyHierarchy")
   titles      Title[]
 
   @@map("agencies")
