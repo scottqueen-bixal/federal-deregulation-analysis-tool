@@ -3,10 +3,11 @@ import { prisma } from '../../../../../../lib/prisma';
 
 export async function GET(
   request: Request,
-  { params }: { params: { agencyId: string } }
+  { params }: { params: Promise<{ agencyId: string }> }
 ) {
   try {
-    const agencyId = parseInt(params.agencyId);
+    const resolvedParams = await params;
+    const agencyId = parseInt(resolvedParams.agencyId);
 
     // Get the selected agency
     const selectedAgency = await prisma.agency.findUnique({

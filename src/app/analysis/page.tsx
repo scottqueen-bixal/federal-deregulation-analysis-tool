@@ -12,6 +12,7 @@ interface AnalysisData {
   wordCount?: number;
   checksum?: string;
   complexityScore?: number;
+  relativeComplexityScore?: number;
   metrics?: {
     totalSections: number;
     totalWords: number;
@@ -139,6 +140,13 @@ export default function Analysis() {
       const url = `/api/analysis/${endpoint}/agency/${targetAgencyId}`;
       const res = await fetch(url);
       const data = await res.json();
+
+      // Handle field mapping for complexity score API
+      if (endpoint === 'complexity_score' && data.complexity_score !== undefined) {
+        data.complexityScore = data.complexity_score;
+        data.relativeComplexityScore = data.relative_complexity_score;
+      }
+
       setAnalysisData(prev => ({ ...prev, ...data }));
     } catch (error) {
       console.error('Error fetching analysis:', error);
@@ -329,27 +337,30 @@ export default function Analysis() {
                   {showComplexityTooltip && (
                     <div className="absolute z-50 w-80 p-4 bg-white border border-gray-300 rounded-lg shadow-lg -top-2 left-8 animate-fade-in">
                       <div className="text-sm text-gray-900">
-                        <h4 className="font-semibold mb-2 text-gray-900">Complexity Score Calculation</h4>
+                        <h4 className="font-semibold mb-2 text-gray-900">Relative Complexity Score</h4>
                         <p className="mb-3 text-gray-800">
-                          Multi-factor score measuring regulatory complexity based on document structure and content density.
+                          Score from 0-100 showing this agency&apos;s regulatory complexity relative to the most complex agency in the dataset.
                         </p>
                         <ul className="list-disc list-inside mb-3 space-y-1 text-gray-700">
-                          <li>Number of regulatory sections</li>
-                          <li>Average words per section (scaled)</li>
-                          <li>Document hierarchy depth analysis</li>
-                          <li>Structural complexity multiplier</li>
+                          <li><strong>Volume:</strong> Total number of regulatory sections</li>
+                          <li><strong>Cross-references:</strong> Citations to other CFR sections</li>
+                          <li><strong>Technical density:</strong> Regulatory jargon frequency</li>
+                          <li><strong>Relative scaling:</strong> Normalized against highest complexity agency</li>
                         </ul>
-                        <p className="text-gray-700 mb-2">
-                          <strong className="text-gray-900">Formula:</strong> Base complexity × Hierarchy multiplier
-                        </p>
-                        <p className="text-gray-700 mb-2">
-                          <strong className="text-gray-900">Score ranges:</strong>
-                        </p>
-                        <ul className="list-disc list-inside mb-3 space-y-1 text-gray-700 ml-4">
-                          <li className="text-green-600"><strong>Under 200:</strong> Low complexity</li>
-                          <li className="text-orange-600"><strong>200-500:</strong> Moderate complexity</li>
-                          <li className="text-red-600"><strong>Above 500:</strong> High complexity</li>
-                        </ul>
+                        <div className="mb-3 space-y-1 text-gray-700">
+                          <div className="flex items-center gap-2">
+                            <span className="w-3 h-3 bg-green-500 rounded"></span>
+                            <span>0-24: Low complexity</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="w-3 h-3 bg-orange-500 rounded"></span>
+                            <span>25-60: Moderate complexity</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="w-3 h-3 bg-red-500 rounded"></span>
+                            <span>61-100: High complexity</span>
+                          </div>
+                        </div>
                         <p className="text-gray-700">
                           <strong className="text-gray-900">Why it matters:</strong> Higher scores indicate regulations with complex navigation and compliance requirements, making them prime candidates for simplification.
                         </p>
@@ -362,12 +373,20 @@ export default function Analysis() {
                 </div>
               </div>
               <p className={`text-4xl font-bold mb-2 ${
-                !analysisData.complexityScore ? 'text-muted-foreground' :
-                analysisData.complexityScore < 200 ? 'text-green-600 dark:text-green-400' :
-                analysisData.complexityScore <= 500 ? 'text-orange-600 dark:text-orange-400' :
+                !analysisData.relativeComplexityScore ? 'text-muted-foreground' :
+                analysisData.relativeComplexityScore < 25 ? 'text-green-600 dark:text-green-400' :
+                analysisData.relativeComplexityScore <= 60 ? 'text-orange-600 dark:text-orange-400' :
                 'text-red-600 dark:text-red-400'
-              }`} aria-label={`Complexity score: ${analysisData.complexityScore?.toFixed(2) || 'Not available'}`}>
-                {analysisData.complexityScore?.toFixed(2) || 'N/A'}
+              }`} aria-label={`Complexity score: ${analysisData.relativeComplexityScore || 'Not available'} out of 100`}>
+                {analysisData.relativeComplexityScore ? `${analysisData.relativeComplexityScore}/100` : 'N/A'}
+              </p>
+              <p className="text-sm text-muted-foreground mb-2">
+                Relative to most complex agency
+                {analysisData.complexityScore && (
+                  <span className="block text-xs opacity-75">
+                    (Raw score: {analysisData.complexityScore.toLocaleString()})
+                  </span>
+                )}
               </p>
               {analysisData.metrics && (
                 <dl className="mt-4 space-y-2 text-sm text-muted-foreground">
@@ -501,7 +520,13 @@ export default function Analysis() {
                 </h3>
                 <ul className="space-y-6" role="list" aria-label="List of CFR titles and their sharing status">
                   {crossCuttingData.crossCuttingTitles.map((title, index) => (
-                    <li key={`title-${index}`} className="border-l-4 border-chart-1 pl-6 py-4 bg-accent/20 rounded-r-lg hover:bg-accent/30 transition-colors duration-200">
+                    <li key={`title-${index}`} className={`border-l-4 pl-6 py-4 bg-accent/20 rounded-r-lg hover:bg-accent/30 transition-colors duration-200 ${
+                      title.impactLevel === 'HIGH' ?
+                        'border-red-200 dark:border-red-800' :
+                      title.impactLevel === 'MEDIUM' ?
+                        'border-yellow-200 dark:border-yellow-800' :
+                        'border-green-200 dark:border-green-800'
+                    }`}>
                       <article className="flex justify-between items-start">
                         <div className="flex-1 pr-4">
                           <h4 className="text-lg font-semibold text-card-foreground mb-2 font-heading">

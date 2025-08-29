@@ -1,148 +1,160 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { prisma } from '../../../../../../lib/prisma';
 
 export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ agencyId: string }> }
+  request: Request,
+  context: { params: Promise<{ agencyId: string }> }
 ) {
-  const { searchParams } = new URL(request.url);
-  const date = searchParams.get('date');
+  const { agencyId } = await context.params;
+
+  console.log(`[Complexity Score] Starting calculation for agency ${agencyId}`);
+  const startTime = Date.now();
 
   try {
-    const resolvedParams = await params;
-    const agencyId = parseInt(resolvedParams.agencyId);
-
-    // Build the where clause for sections
-    const sectionWhere: {
-      version: {
-        title: { agencyId: number };
-        date?: Date;
-      };
-    } = {
-      version: {
-        title: {
-          agencyId,
-        },
-      },
-    };
-
-    if (date) {
-      sectionWhere.version.date = new Date(date);
-    } else {
-      // Get latest version that has sections
-      const latestVersion = await prisma.version.findFirst({
-        where: {
+    // Query section count and basic info for the given agency (much faster)
+    console.log(`[Complexity Score] Querying section count for agency ${agencyId}`);
+    const sectionCount = await prisma.section.count({
+      where: {
+        version: {
           title: {
-            agencyId,
-          },
-          sections: {
-            some: {}, // Ensure the version has at least one section
-          },
-        },
-        orderBy: {
-          date: 'desc',
-        },
-      });
-      if (latestVersion) {
-        sectionWhere.version.date = latestVersion.date;
+            agencyId: parseInt(agencyId)
+          }
+        }
       }
+    });
+
+    console.log(`[Complexity Score] Found ${sectionCount} sections total`);
+
+    if (sectionCount === 0) {
+      console.log(`[Complexity Score] No sections found for agency ${agencyId}`);
+      return NextResponse.json({
+        agencyId: parseInt(agencyId),
+        complexity_score: 0,
+        relative_complexity_score: 0,
+        hierarchy_depth: 3,
+        cross_references: 0,
+        technical_terms: 0,
+        calculation_details: {
+          total_sections: 0,
+          hierarchy_depth: 3,
+          cross_references: 0,
+          technical_terms: 0,
+          relative_score_out_of_100: 0
+        }
+      });
     }
 
+    // For large datasets, use sampling instead of processing everything
+    const sampleSize = Math.min(sectionCount, 100); // Process max 100 sections to avoid memory issues
+    console.log(`[Complexity Score] Using sample size of ${sampleSize} sections`);
+
     const sections = await prisma.section.findMany({
-      where: sectionWhere,
-      select: {
-        wordCount: true,
-        identifier: true,
+      where: {
         version: {
-          select: {
-            structureJson: true,
-          },
-        },
+          title: {
+            agencyId: parseInt(agencyId)
+          }
+        }
       },
+      select: {
+        identifier: true,
+        textContent: true
+      },
+      take: sampleSize
     });
 
-    const totalSections = sections.length;
-    const totalWords = sections.reduce((sum, s) => sum + s.wordCount, 0);
-    const avgWordsPerSection = totalSections > 0 ? totalWords / totalSections : 0;
+    console.log(`[Complexity Score] Retrieved ${sections.length} sections for analysis`);
 
-    // Calculate dynamic hierarchy depth based on section identifiers and structure
-    const calculateHierarchyDepth = (
-      sections: Array<{ identifier: string; version?: { structureJson: unknown } | null }>,
-      structureJson: unknown
-    ) => {
-      if (!sections.length) return 1;
+    // Use a fixed hierarchy depth to avoid expensive calculations
+    const hierarchyDepth = 3; // Reasonable default for regulatory documents
+    console.log(`[Complexity Score] Using fixed hierarchy depth: ${hierarchyDepth}`);
 
-      // Method 1: Analyze section identifiers (e.g., "1.1.1.1" has depth 4)
-      const maxIdentifierDepth = Math.max(...sections.map(section => {
-        const identifier = section.identifier || '';
-        // Count dots and other hierarchy indicators
-        const dotDepth = (identifier.match(/\./g) || []).length + 1;
-        const dashDepth = (identifier.match(/-/g) || []).length + 1;
-        const parenDepth = (identifier.match(/\([a-zA-Z0-9]+\)/g) || []).length;
+    // Estimate cross-references and technical terms based on sample
+    console.log(`[Complexity Score] Estimating cross-references and technical terms from sample`);
 
-        return Math.max(dotDepth, dashDepth) + parenDepth;
-      }));
+    let crossReferencesInSample = 0;
+    let technicalTermsInSample = 0;
 
-      // Method 2: Analyze structure JSON if available
-      let structureDepth = 1;
-      if (structureJson && typeof structureJson === 'object') {
-        const calculateJsonDepth = (obj: unknown, currentDepth = 1): number => {
-          let maxDepth = currentDepth;
+    // Process in smaller batches to avoid memory issues
+    const batchSize = 100;
+    for (let i = 0; i < sections.length; i += batchSize) {
+      const batch = sections.slice(i, i + batchSize);
 
-          if (Array.isArray(obj)) {
-            for (const item of obj) {
-              maxDepth = Math.max(maxDepth, calculateJsonDepth(item, currentDepth));
-            }
-          } else if (obj && typeof obj === 'object') {
-            const objRecord = obj as Record<string, unknown>;
-            for (const key of Object.keys(objRecord)) {
-              if (key.includes('section') || key.includes('part') || key.includes('subpart') ||
-                  key.includes('chapter') || key.includes('title') || key.includes('subsection')) {
-                maxDepth = Math.max(maxDepth, calculateJsonDepth(objRecord[key], currentDepth + 1));
-              } else {
-                maxDepth = Math.max(maxDepth, calculateJsonDepth(objRecord[key], currentDepth));
-              }
-            }
-          }
+      batch.forEach(section => {
+        const content = section.textContent || '';
 
-          return maxDepth;
-        };
+        // Count CFR references
+        const cfrMatches = content.match(/(\d+\s*CFR\s*\d+\.\d+|§\s*\d+\.\d+)/gi) || [];
+        crossReferencesInSample += cfrMatches.length;
 
-        structureDepth = calculateJsonDepth(structureJson);
+        // Count technical terms (simplified patterns)
+        const technicalCount = (content.match(/\b(shall|must|required|prohibited|compliance)\b/gi) || []).length;
+        technicalTermsInSample += technicalCount;
+      });
+    }
+
+    // Scale up estimates based on sample vs total
+    const scaleFactor = sectionCount / sections.length;
+    const crossReferences = Math.round(crossReferencesInSample * scaleFactor);
+    const technicalTerms = Math.round(technicalTermsInSample * scaleFactor);
+
+    console.log(`[Complexity Score] Cross-references estimated: ${crossReferences}`);
+    console.log(`[Complexity Score] Technical terms estimated: ${technicalTerms}`);
+
+    // Calculate complexity score using simplified factors (no hierarchy depth)
+    const complexity = (
+      (sectionCount * 0.5) +              // Volume weight based on total sections
+      (crossReferences * 2) +             // Cross-reference weight
+      (technicalTerms * 0.1)              // Technical language weight
+    );
+
+    const complexityScore = Math.round(complexity);
+    console.log(`[Complexity Score] Final complexity score: ${complexityScore}`);
+
+    // Get max complexity score for relative calculation
+    console.log(`[Complexity Score] Fetching max complexity score for relative calculation`);
+    let relativeScore = 0;
+    try {
+      const maxResponse = await fetch(`http://localhost:3000/api/analysis/complexity_score/max`);
+      if (maxResponse.ok) {
+        const maxData = await maxResponse.json();
+        const maxScore = maxData.max_complexity_score;
+        if (maxScore > 0) {
+          relativeScore = Math.round((complexityScore / maxScore) * 100);
+          console.log(`[Complexity Score] Relative score: ${relativeScore}/100 (${complexityScore}/${maxScore})`);
+        }
       }
+    } catch (error) {
+      console.warn(`[Complexity Score] Could not fetch max score for relative calculation:`, error);
+    }
 
-      // Use the maximum of both methods, with reasonable bounds
-      const hierarchyDepth = Math.max(maxIdentifierDepth, structureDepth);
-      return Math.min(Math.max(hierarchyDepth, 1), 10); // Bound between 1 and 10
-    };
-
-    // Get structure from first section's version (they should all be the same)
-    const structureJson = sections.length > 0 ? sections[0].version?.structureJson : null;
-    const hierarchyDepth = calculateHierarchyDepth(sections, structureJson);
-
-    // Enhanced complexity score calculation
-    // Base complexity from document size and structure
-    const baseComplexity = totalSections + (avgWordsPerSection / 10); // Scale down words
-
-    // Hierarchy multiplier: deeper structures are more complex to navigate
-    const hierarchyMultiplier = 1 + (hierarchyDepth - 1) * 0.3; // 30% increase per level
-
-    // Final complexity score
-    const complexityScore = baseComplexity * hierarchyMultiplier;
+    console.log(`[Complexity Score] Total time: ${Date.now() - startTime}ms`);
 
     return NextResponse.json({
-      agencyId,
-      date,
-      complexityScore,
-      metrics: {
-        totalSections,
-        totalWords,
-        avgWordsPerSection,
-        hierarchyDepth,
-      },
+      agencyId: parseInt(agencyId),
+      complexity_score: complexityScore,
+      relative_complexity_score: relativeScore,
+      hierarchy_depth: hierarchyDepth,
+      cross_references: crossReferences,
+      technical_terms: technicalTerms,
+      calculation_details: {
+        total_sections: sectionCount,        // Use actual total count
+        hierarchy_depth: hierarchyDepth,
+        cross_references: crossReferences,
+        technical_terms: technicalTerms,
+        volume_weight: sectionCount * 0.5,  // Use actual total count
+        structure_weight: 0, // No longer using hierarchy depth
+        cross_reference_weight: crossReferences * 2,
+        technical_weight: technicalTerms * 0.1,
+        relative_score_out_of_100: relativeScore
+      }
     });
+
   } catch (error) {
-    console.error(error);
-    return NextResponse.json({ error: 'Failed to fetch complexity score' }, { status: 500 });
+    console.error('Error calculating complexity score:', error);
+    return NextResponse.json(
+      { error: 'Failed to calculate complexity score', details: error },
+      { status: 500 }
+    );
   }
 }

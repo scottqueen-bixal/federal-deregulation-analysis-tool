@@ -17,11 +17,11 @@ interface TitleWithDate {
   };
 }
 
-interface AgencyData {
-  name: string;
-  description?: string;
-  slug: string;
-}
+// interface AgencyData {
+//   name: string;
+//   description?: string;
+//   slug: string;
+// }
 
 interface TitleData {
   number: number;
@@ -138,9 +138,9 @@ async function ingestData() {
   const targetAgencies = [
     'Department of Agriculture',
     'Department of Commerce',
-    'Department of Defense',
-    'Department of Justice',
-    'Department of Labor'
+    // 'Department of Defense',
+    // 'Department of Justice',
+    // 'Department of Labor'
   ];
 
   const matchedRawAgencies = data.agencies.filter((agency: RawAgency) =>
