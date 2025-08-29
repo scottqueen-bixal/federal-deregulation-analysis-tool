@@ -51,6 +51,10 @@ export default function Analysis() {
   const [analysisData, setAnalysisData] = useState<AnalysisData>({});
   const [crossCuttingData, setCrossCuttingData] = useState<CrossCuttingData | null>(null);
   const [agenciesLoading, setAgenciesLoading] = useState(true);
+  const [showWordCountTooltip, setShowWordCountTooltip] = useState(false);
+  const [showChecksumTooltip, setShowChecksumTooltip] = useState(false);
+  const [showComplexityTooltip, setShowComplexityTooltip] = useState(false);
+  const [showCrossCuttingTooltip, setShowCrossCuttingTooltip] = useState(false);
 
   useEffect(() => {
     fetch('/api/data/agencies')
@@ -163,7 +167,44 @@ export default function Analysis() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8" role="region" aria-label="Key analysis metrics">
             <article className="bg-card border border-border rounded-lg p-8 shadow-sm hover:shadow-md transition-shadow duration-200">
-              <h3 className="text-xl font-semibold mb-4 text-card-foreground font-heading">Word Count</h3>
+              <div className="flex items-center gap-2 mb-4">
+                <h3 className="text-xl font-semibold text-card-foreground font-heading">Word Count</h3>
+                <div className="relative">
+                  <button
+                    type="button"
+                    className="w-5 h-5 rounded-full bg-gray-200 hover:bg-white border border-gray-300 hover:border-gray-400 text-gray-700 hover:text-gray-900 transition-colors duration-200 flex items-center justify-center text-xs font-bold"
+                    onMouseEnter={() => setShowWordCountTooltip(true)}
+                    onMouseLeave={() => setShowWordCountTooltip(false)}
+                    onFocus={() => setShowWordCountTooltip(true)}
+                    onBlur={() => setShowWordCountTooltip(false)}
+                    aria-label="Word count information"
+                  >
+                    i
+                  </button>
+                  {showWordCountTooltip && (
+                    <div className="absolute z-50 w-80 p-4 bg-white border border-gray-300 rounded-lg shadow-lg -top-2 left-8 animate-fade-in">
+                      <div className="text-sm text-gray-900">
+                        <h4 className="font-semibold mb-2 text-gray-900">Word Count Calculation</h4>
+                        <p className="mb-3 text-gray-800">
+                          Counts all words in the agency&apos;s Code of Federal Regulations (CFR) sections, including:
+                        </p>
+                        <ul className="list-disc list-inside mb-3 space-y-1 text-gray-700">
+                          <li>Regulatory text and definitions</li>
+                          <li>Requirements and procedures</li>
+                          <li>Compliance guidelines</li>
+                          <li>Enforcement provisions</li>
+                        </ul>
+                        <p className="text-gray-700">
+                          <strong className="text-gray-900">Why it matters:</strong> Higher word counts often indicate more complex regulations that may burden businesses and citizens with compliance costs.
+                        </p>
+                      </div>
+                      {/* Tooltip arrow */}
+                      <div className="absolute top-3 -left-2 w-0 h-0 border-t-8 border-b-8 border-r-8 border-transparent border-r-gray-300"></div>
+                      <div className="absolute top-3 -left-1 w-0 h-0 border-t-8 border-b-8 border-r-8 border-transparent border-r-white"></div>
+                    </div>
+                  )}
+                </div>
+              </div>
               <p className="text-4xl font-bold text-chart-1 mb-2" aria-label={`Total word count: ${analysisData.wordCount?.toLocaleString() || 'Not available'}`}>
                 {analysisData.wordCount?.toLocaleString() || 'N/A'}
               </p>
@@ -171,7 +212,44 @@ export default function Analysis() {
             </article>
 
             <article className="bg-card border border-border rounded-lg p-8 shadow-sm hover:shadow-md transition-shadow duration-200">
-              <h3 className="text-xl font-semibold mb-4 text-card-foreground font-heading">Document Checksum</h3>
+              <div className="flex items-center gap-2 mb-4">
+                <h3 className="text-xl font-semibold text-card-foreground font-heading">Document Checksum</h3>
+                <div className="relative">
+                  <button
+                    type="button"
+                    className="w-5 h-5 rounded-full bg-gray-200 hover:bg-white border border-gray-300 hover:border-gray-400 text-gray-700 hover:text-gray-900 transition-colors duration-200 flex items-center justify-center text-xs font-bold"
+                    onMouseEnter={() => setShowChecksumTooltip(true)}
+                    onMouseLeave={() => setShowChecksumTooltip(false)}
+                    onFocus={() => setShowChecksumTooltip(true)}
+                    onBlur={() => setShowChecksumTooltip(false)}
+                    aria-label="Document checksum information"
+                  >
+                    i
+                  </button>
+                  {showChecksumTooltip && (
+                    <div className="absolute z-50 w-80 p-4 bg-white border border-gray-300 rounded-lg shadow-lg -top-2 left-8 animate-fade-in">
+                      <div className="text-sm text-gray-900">
+                        <h4 className="font-semibold mb-2 text-gray-900">Document Checksum</h4>
+                        <p className="mb-3 text-gray-800">
+                          A unique cryptographic fingerprint (hash) generated from the regulatory text content.
+                        </p>
+                        <ul className="list-disc list-inside mb-3 space-y-1 text-gray-700">
+                          <li>Verifies document integrity</li>
+                          <li>Detects any content changes</li>
+                          <li>Ensures data consistency</li>
+                          <li>Enables version tracking</li>
+                        </ul>
+                        <p className="text-gray-700">
+                          <strong className="text-gray-900">Why it matters:</strong> Checksums provide audit trails and ensure the regulatory text hasn&apos;t been altered, maintaining data integrity for analysis.
+                        </p>
+                      </div>
+                      {/* Tooltip arrow */}
+                      <div className="absolute top-3 -left-2 w-0 h-0 border-t-8 border-b-8 border-r-8 border-transparent border-r-gray-300"></div>
+                      <div className="absolute top-3 -left-1 w-0 h-0 border-t-8 border-b-8 border-r-8 border-transparent border-r-white"></div>
+                    </div>
+                  )}
+                </div>
+              </div>
               <p className="text-sm font-mono break-all text-muted-foreground bg-muted p-3 rounded border" aria-label={`Document checksum: ${analysisData.checksum || 'Not available'}`}>
                 {analysisData.checksum || 'N/A'}
               </p>
@@ -179,7 +257,52 @@ export default function Analysis() {
             </article>
 
             <article className="bg-card border border-border rounded-lg p-8 shadow-sm hover:shadow-md transition-shadow duration-200">
-              <h3 className="text-xl font-semibold mb-4 text-card-foreground font-heading">Complexity Score</h3>
+              <div className="flex items-center gap-2 mb-4">
+                <h3 className="text-xl font-semibold text-card-foreground font-heading">Complexity Score</h3>
+                <div className="relative">
+                  <button
+                    type="button"
+                    className="w-5 h-5 rounded-full bg-gray-200 hover:bg-white border border-gray-300 hover:border-gray-400 text-gray-700 hover:text-gray-900 transition-colors duration-200 flex items-center justify-center text-xs font-bold"
+                    onMouseEnter={() => setShowComplexityTooltip(true)}
+                    onMouseLeave={() => setShowComplexityTooltip(false)}
+                    onFocus={() => setShowComplexityTooltip(true)}
+                    onBlur={() => setShowComplexityTooltip(false)}
+                    aria-label="Complexity score information"
+                  >
+                    i
+                  </button>
+                  {showComplexityTooltip && (
+                    <div className="absolute z-50 w-80 p-4 bg-white border border-gray-300 rounded-lg shadow-lg -top-2 left-8 animate-fade-in">
+                      <div className="text-sm text-gray-900">
+                        <h4 className="font-semibold mb-2 text-gray-900">Complexity Score Calculation</h4>
+                        <p className="mb-3 text-gray-800">
+                          Measures regulatory complexity based on document structure and content density.
+                        </p>
+                        <ul className="list-disc list-inside mb-3 space-y-1 text-gray-700">
+                          <li>Average words per section</li>
+                          <li>Number of regulatory sections</li>
+                          <li>Cross-references and citations</li>
+                          <li>Technical terminology density</li>
+                        </ul>
+                        <p className="text-gray-700 mb-2">
+                          <strong className="text-gray-900">Score ranges:</strong>
+                        </p>
+                        <ul className="list-disc list-inside mb-3 space-y-1 text-gray-700 ml-4">
+                          <li className="text-green-600"><strong>Under 20:</strong> Low complexity</li>
+                          <li className="text-orange-600"><strong>20-50:</strong> Moderate complexity</li>
+                          <li className="text-red-600"><strong>Above 50:</strong> High complexity</li>
+                        </ul>
+                        <p className="text-gray-700">
+                          <strong className="text-gray-900">Why it matters:</strong> Higher scores indicate regulations that may be difficult to understand and comply with, making them prime candidates for simplification.
+                        </p>
+                      </div>
+                      {/* Tooltip arrow */}
+                      <div className="absolute top-3 -left-2 w-0 h-0 border-t-8 border-b-8 border-r-8 border-transparent border-r-gray-300"></div>
+                      <div className="absolute top-3 -left-1 w-0 h-0 border-t-8 border-b-8 border-r-8 border-transparent border-r-white"></div>
+                    </div>
+                  )}
+                </div>
+              </div>
               <p className={`text-4xl font-bold mb-2 ${
                 !analysisData.complexityScore ? 'text-muted-foreground' :
                 analysisData.complexityScore < 20 ? 'text-green-600 dark:text-green-400' :
@@ -237,7 +360,51 @@ export default function Analysis() {
               </article>
 
               <article className="bg-card border border-border rounded-lg p-8 shadow-sm hover:shadow-md transition-shadow duration-200">
-                <h3 className="text-xl font-semibold mb-4 text-card-foreground font-heading">Cross-Cutting Impact</h3>
+                <div className="flex items-center gap-2 mb-4">
+                  <h3 className="text-xl font-semibold text-card-foreground font-heading">Cross-Cutting Impact</h3>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      className="w-5 h-5 rounded-full bg-gray-200 hover:bg-white border border-gray-300 hover:border-gray-400 text-gray-700 hover:text-gray-900 transition-colors duration-200 flex items-center justify-center text-xs font-bold"
+                      onMouseEnter={() => setShowCrossCuttingTooltip(true)}
+                      onMouseLeave={() => setShowCrossCuttingTooltip(false)}
+                      onFocus={() => setShowCrossCuttingTooltip(true)}
+                      onBlur={() => setShowCrossCuttingTooltip(false)}
+                      aria-label="Cross-cutting impact information"
+                    >
+                      i
+                    </button>
+                    {showCrossCuttingTooltip && (
+                      <div className="absolute z-50 w-80 p-4 bg-white border border-gray-300 rounded-lg shadow-lg -top-2 left-8 animate-fade-in">
+                        <div className="text-sm text-gray-900">
+                          <h4 className="font-semibold mb-2 text-gray-900">Cross-Cutting Impact Analysis</h4>
+                          <p className="mb-3 text-gray-800">
+                            Evaluates how regulations interact with and impact other agencies or regulatory domains.
+                          </p>
+                          <ul className="list-disc list-inside mb-3 space-y-1 text-gray-700">
+                            <li>Inter-agency regulatory overlap</li>
+                            <li>Shared enforcement responsibilities</li>
+                            <li>Cross-sector compliance requirements</li>
+                            <li>Multi-jurisdictional implications</li>
+                          </ul>
+                          <p className="text-gray-700 mb-2">
+                            <strong className="text-gray-900">Badges indicate:</strong>
+                          </p>
+                          <ul className="list-disc list-inside mb-3 space-y-1 text-gray-700 ml-4">
+                            <li><span className="inline-block w-3 h-3 bg-red-600 rounded-full mr-2"></span><strong>High Impact:</strong> Significant cross-agency effects</li>
+                            <li><span className="inline-block w-3 h-3 bg-orange-600 rounded-full mr-2"></span><strong>Shared Authority:</strong> Multiple agencies involved</li>
+                          </ul>
+                          <p className="text-gray-700">
+                            <strong className="text-gray-900">Why it matters:</strong> Understanding cross-cutting impacts helps identify regulations that require coordinated reform efforts and potential bureaucratic conflicts.
+                          </p>
+                        </div>
+                        {/* Tooltip arrow */}
+                        <div className="absolute top-3 -left-2 w-0 h-0 border-t-8 border-b-8 border-r-8 border-transparent border-r-gray-300"></div>
+                        <div className="absolute top-3 -left-1 w-0 h-0 border-t-8 border-b-8 border-r-8 border-transparent border-r-white"></div>
+                      </div>
+                    )}
+                  </div>
+                </div>
                 <p className={`text-4xl font-bold mb-2 ${
                   crossCuttingData.summary.crossCuttingPercentage < 20 ? 'text-green-600 dark:text-green-400' :
                   crossCuttingData.summary.crossCuttingPercentage <= 50 ? 'text-orange-600 dark:text-orange-400' :
@@ -292,7 +459,7 @@ export default function Analysis() {
                         </div>
                       </article>
                       {title.isShared && title.sharedWith.length > 0 && (
-                        <div className="mt-4 pl-4 border-l-2 border-muted">
+                        <div>
                           <p className="text-sm text-muted-foreground">
                             <span className="font-semibold text-card-foreground">Shared with:</span>
                             <span className="ml-2" aria-label={`Shared with the following agencies: ${title.sharedWith.map(agency => agency.name).join(', ')}`}>
