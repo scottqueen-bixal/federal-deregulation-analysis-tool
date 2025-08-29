@@ -4,7 +4,6 @@ import * as crypto from 'crypto';
 const BASE_URL = 'https://www.ecfr.gov';
 
 interface AgencyData {
-  id: number;
   name: string;
   description?: string;
   slug: string;
@@ -17,10 +16,13 @@ interface TitleData {
 }
 
 interface RawAgency {
-  id: number;
-  name: string;
-  description?: string;
   slug: string;
+  name: string;
+  short_name: string;
+  display_name: string;
+  sortable_name: string;
+  children: unknown[];
+  cfr_references: { title: number; chapter: string }[];
 }
 
 interface SectionData {
@@ -32,10 +34,32 @@ interface SectionData {
 async function fetchAgencies(): Promise<AgencyData[]> {
   const response = await fetch(`${BASE_URL}/api/admin/v1/agencies.json`);
   const data = await response.json();
-  return data.agencies.map((agency: RawAgency) => ({
-    id: agency.id,
+
+  // Debug: Log a few agency names to see what's available
+  console.log('Sample agencies from API:');
+  data.agencies.slice(0, 3).forEach((agency: RawAgency, index: number) => {
+    console.log(`  ${index}: ${agency.name} (slug: ${agency.slug})`);
+  });
+
+  // Select agencies by their names - major regulatory agencies
+  const selectedNames = [
+    "Department of Agriculture",
+    "Department of Defense",
+    "Department of Commerce",
+    "Department of Labor",
+    "Department of Justice"
+  ];
+
+  const matchedAgencies = data.agencies.filter((agency: RawAgency) =>
+    selectedNames.includes(agency.name)
+  );
+
+  console.log(`Found ${matchedAgencies.length} matching agencies out of ${selectedNames.length} requested`);
+  matchedAgencies.forEach((agency: RawAgency) => console.log(`  - ${agency.name} (slug: ${agency.slug})`));
+
+  return matchedAgencies.map((agency: RawAgency) => ({
     name: agency.name,
-    description: agency.description,
+    description: agency.short_name, // Use short_name as description since no description field
     slug: agency.slug,
   }));
 }
@@ -43,6 +67,13 @@ async function fetchAgencies(): Promise<AgencyData[]> {
 async function fetchTitles(): Promise<TitleData[]> {
   const response = await fetch(`${BASE_URL}/api/versioner/v1/titles.json`);
   const data = await response.json();
+
+  // Debug: log first few titles to see the structure
+  console.log('Sample titles from API:');
+  data.titles.slice(0, 3).forEach((title: unknown, index: number) => {
+    console.log(`  Title ${index}:`, JSON.stringify(title, null, 2));
+  });
+
   return data.titles;
 }
 
@@ -112,22 +143,37 @@ async function ingestData() {
   console.log('Fetching agencies...');
   const agencies = await fetchAgencies();
 
+  // Create agencies in database and get their IDs
+  const createdAgencies = [];
   for (const agency of agencies) {
-    await prisma.agency.upsert({
+    const createdAgency = await prisma.agency.upsert({
       where: { slug: agency.slug },
       update: { name: agency.name, description: agency.description },
-      create: agency,
+      create: {
+        name: agency.name,
+        description: agency.description,
+        slug: agency.slug,
+      },
     });
+    createdAgencies.push(createdAgency);
   }
 
   console.log('Fetching titles...');
   const titlesData = await fetchTitles();
 
+  // Since ECFR API doesn't directly map titles to agencies, we'll need to
+  // assign titles to agencies based on CFR references or use a simpler approach
+  // For now, let's distribute titles evenly among our selected agencies
+  console.log(`Processing ${titlesData.length} titles for ${createdAgencies.length} selected agencies`);
+
+  // Log title count per agency for debugging
+  const titleCountByAgency: Record<string, number> = {};
+
+  let agencyIndex = 0;
   for (const titleData of titlesData) {
-    const agency = await prisma.agency.findFirst({
-      where: { id: titleData.agencyId },
-    });
-    if (!agency) continue;
+    const agency = createdAgencies[agencyIndex % createdAgencies.length];
+
+    titleCountByAgency[agency.name] = (titleCountByAgency[agency.name] || 0) + 1;
 
     await prisma.title.upsert({
       where: { code: titleData.number.toString() },
@@ -138,7 +184,11 @@ async function ingestData() {
         agencyId: agency.id,
       },
     });
+
+    agencyIndex++;
   }
+
+  console.log('Titles per agency:', titleCountByAgency);
 
   // For each title, fetch latest data
   const titles = await prisma.title.findMany();

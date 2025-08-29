@@ -26,67 +26,86 @@ async function testEndpoint(url, description) {
 async function runTests() {
   console.log("Starting API endpoint tests...\n");
 
-  // Test 1: Get all agencies
-  await testEndpoint(`${BASE_URL}/api/data/agencies`, "Get all agencies");
+  // Define the agencies we want to test
+  const selectedNames = [
+    "Department of Agriculture",
+    "Department of Defense",
+    "Department of Commerce",
+    "Department of Labor",
+    "Department of Justice",
+  ];
 
-  // Test 2: Get all titles
-  await testEndpoint(`${BASE_URL}/api/data/titles`, "Get all titles");
+  console.log("Testing agencies:", selectedNames.join(", "));
+  console.log("=".repeat(60));
 
-  // For the agency-specific endpoints, we need a valid agencyId
-  // First, let's get agencies and use the first one
+  // Test 1: Get all agencies and filter for our selected ones
   try {
     const agenciesResponse = await fetch(`${BASE_URL}/api/data/agencies`);
     if (agenciesResponse.ok) {
       const agenciesData = await agenciesResponse.json();
-      const agencies = agenciesData.agencies;
+      const allAgencies = agenciesData.agencies;
 
-      if (agencies && agencies.length > 0) {
-        const agencyId = agencies[0].id;
-        console.log(
-          `\nUsing agency ID: ${agencyId} (${agencies[0].name}) for further tests\n`
-        );
+      // Filter to only our selected agencies
+      const selectedAgencies = allAgencies.filter((agency) =>
+        selectedNames.includes(agency.name)
+      );
+
+      console.log(
+        `\nFound ${selectedAgencies.length} out of ${selectedNames.length} selected agencies:\n`
+      );
+
+      if (selectedAgencies.length === 0) {
+        console.log("❌ No selected agencies found in the database!");
+        console.log("Available agencies:");
+        allAgencies.slice(0, 10).forEach((agency) => {
+          console.log(`  - ${agency.name} (ID: ${agency.id})`);
+        });
+        return;
+      }
+
+      // Test each selected agency
+      for (const agency of selectedAgencies) {
+        console.log(`\n🔍 Testing Agency: ${agency.name} (ID: ${agency.id})`);
+        console.log("-".repeat(50));
 
         // Test 3: Checksum for agency
         await testEndpoint(
-          `${BASE_URL}/api/analysis/checksum/agency/${agencyId}`,
-          "Checksum analysis"
+          `${BASE_URL}/api/analysis/checksum/agency/${agency.id}`,
+          `Checksum analysis for ${agency.name}`
         );
 
         // Test 4: Complexity score for agency
         await testEndpoint(
-          `${BASE_URL}/api/analysis/complexity_score/agency/${agencyId}`,
-          "Complexity score analysis"
+          `${BASE_URL}/api/analysis/complexity_score/agency/${agency.id}`,
+          `Complexity score analysis for ${agency.name}`
         );
 
         // Test 5: Word count for agency
         await testEndpoint(
-          `${BASE_URL}/api/analysis/word_count/agency/${agencyId}`,
-          "Word count analysis"
+          `${BASE_URL}/api/analysis/word_count/agency/${agency.id}`,
+          `Word count analysis for ${agency.name}`
         );
-
-        // Test 6: Historical changes (need from and to dates)
-        // For now, let's try with some sample dates
-        const fromDate = "2024-01-01";
-        const toDate = "2024-12-31";
-        await testEndpoint(
-          `${BASE_URL}/api/analysis/historical_changes/agency/${agencyId}?from=${fromDate}&to=${toDate}`,
-          "Historical changes analysis"
-        );
-
-        // Test 7: Get titles for specific agency
-        await testEndpoint(
-          `${BASE_URL}/api/data/titles?agencyId=${agencyId}`,
-          "Get titles for specific agency"
-        );
-      } else {
-        console.log("No agencies found in database");
       }
+
+      // Show which agencies were not found
+      const foundNames = selectedAgencies.map((a) => a.name);
+      const missingNames = selectedNames.filter(
+        (name) => !foundNames.includes(name)
+      );
+
+      if (missingNames.length > 0) {
+        console.log(`\n⚠️  Agencies not found in database:`);
+        missingNames.forEach((name) => console.log(`  - ${name}`));
+      }
+    } else {
+      console.log("❌ Failed to fetch agencies from API");
     }
   } catch (error) {
-    console.log("Error fetching agencies:", error.message);
+    console.log("❌ Error fetching agencies:", error.message);
   }
 
-  console.log("\nAPI endpoint tests completed.");
+  console.log("\n" + "=".repeat(60));
+  console.log("API endpoint tests completed.");
 }
 
 // Run the tests
