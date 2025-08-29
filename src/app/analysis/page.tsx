@@ -65,6 +65,10 @@ export default function Analysis() {
     selectedAgency: { id: 0, name: '', slug: '' },
   });
   const [agenciesLoading, setAgenciesLoading] = useState(true);
+  const [wordCountLoading, setWordCountLoading] = useState(false);
+  const [checksumLoading, setChecksumLoading] = useState(false);
+  const [complexityScoreLoading, setComplexityScoreLoading] = useState(false);
+  const [crossCuttingLoading, setCrossCuttingLoading] = useState(false);
   const [showWordCountTooltip, setShowWordCountTooltip] = useState(false);
   const [showChecksumTooltip, setShowChecksumTooltip] = useState(false);
   const [showComplexityTooltip, setShowComplexityTooltip] = useState(false);
@@ -136,6 +140,11 @@ export default function Analysis() {
     const targetAgencyId = agencyId || selectedAgency;
     if (!targetAgencyId) return;
 
+    // Set loading state based on endpoint
+    if (endpoint === 'word_count') setWordCountLoading(true);
+    else if (endpoint === 'checksum') setChecksumLoading(true);
+    else if (endpoint === 'complexity_score') setComplexityScoreLoading(true);
+
     try {
       const url = `/api/analysis/${endpoint}/agency/${targetAgencyId}`;
       const res = await fetch(url);
@@ -150,16 +159,24 @@ export default function Analysis() {
       setAnalysisData(prev => ({ ...prev, ...data }));
     } catch (error) {
       console.error('Error fetching analysis:', error);
+    } finally {
+      // Clear loading state
+      if (endpoint === 'word_count') setWordCountLoading(false);
+      else if (endpoint === 'checksum') setChecksumLoading(false);
+      else if (endpoint === 'complexity_score') setComplexityScoreLoading(false);
     }
   };
 
   const fetchCrossCuttingData = async (agencyId: number) => {
+    setCrossCuttingLoading(true);
     try {
       const response = await fetch(`/api/analysis/cross-cutting/agency/${agencyId}`);
       const data = await response.json();
       setCrossCuttingData(data);
     } catch (error) {
       console.error('Error fetching cross-cutting data:', error);
+    } finally {
+      setCrossCuttingLoading(false);
     }
   };
 
@@ -199,6 +216,9 @@ export default function Analysis() {
                       const agencyId = parseInt(e.target.value);
                       setSelectedAgency(agencyId);
                       if (agencyId) {
+                        // Reset analysis data
+                        setAnalysisData({});
+                        // Fetch all data
                         fetchCrossCuttingData(agencyId);
                         fetchAnalysis('word_count', agencyId);
                         fetchAnalysis('checksum', agencyId);
@@ -268,9 +288,18 @@ export default function Analysis() {
                   )}
                 </div>
               </div>
-              <p className="text-4xl font-bold text-chart-1 mb-2" aria-label={`Total word count: ${analysisData.wordCount?.toLocaleString() || 'Not available'}`}>
-                {analysisData.wordCount?.toLocaleString() || 'N/A'}
-              </p>
+              <div className="flex items-center gap-4">
+                {wordCountLoading ? (
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-chart-1"></div>
+                    <p className="text-4xl font-bold text-muted-foreground">Loading...</p>
+                  </div>
+                ) : (
+                  <p className="text-4xl font-bold text-chart-1 mb-2" aria-label={`Total word count: ${analysisData.wordCount?.toLocaleString() || 'Not available'}`}>
+                    {analysisData.wordCount?.toLocaleString() || 'N/A'}
+                  </p>
+                )}
+              </div>
               <p className="text-sm text-muted-foreground">Total regulatory text volume</p>
             </article>
 
@@ -313,10 +342,19 @@ export default function Analysis() {
                   )}
                 </div>
               </div>
-              <p className="text-sm font-mono break-all text-muted-foreground bg-muted p-3 rounded border" aria-label={`Document checksum: ${analysisData.checksum || 'Not available'}`}>
-                {analysisData.checksum || 'N/A'}
-              </p>
-              <p className="text-sm text-muted-foreground mt-2">Verification hash</p>
+              <div className="flex flex-col gap-2">
+                {checksumLoading ? (
+                  <div className="flex items-center gap-2 p-3 bg-muted rounded border">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-chart-2"></div>
+                    <span className="text-sm text-muted-foreground">Calculating checksum...</span>
+                  </div>
+                ) : (
+                  <p className="text-sm font-mono break-all text-muted-foreground bg-muted p-3 rounded border" aria-label={`Document checksum: ${analysisData.checksum || 'Not available'}`}>
+                    {analysisData.checksum || 'N/A'}
+                  </p>
+                )}
+                <p className="text-sm text-muted-foreground">Verification hash</p>
+              </div>
             </article>
 
             <article className="bg-card border border-border rounded-lg p-8 shadow-sm hover:shadow-md transition-shadow duration-200">
@@ -372,23 +410,32 @@ export default function Analysis() {
                   )}
                 </div>
               </div>
-              <p className={`text-4xl font-bold mb-2 ${
-                !analysisData.relativeComplexityScore ? 'text-muted-foreground' :
-                analysisData.relativeComplexityScore < 25 ? 'text-green-600 dark:text-green-400' :
-                analysisData.relativeComplexityScore <= 60 ? 'text-orange-600 dark:text-orange-400' :
-                'text-red-600 dark:text-red-400'
-              }`} aria-label={`Complexity score: ${analysisData.relativeComplexityScore || 'Not available'} out of 100`}>
-                {analysisData.relativeComplexityScore ? `${analysisData.relativeComplexityScore}/100` : 'N/A'}
-              </p>
-              <p className="text-sm text-muted-foreground mb-2">
-                Relative to most complex agency
-                {analysisData.complexityScore && (
-                  <span className="block text-xs opacity-75">
-                    (Raw score: {analysisData.complexityScore.toLocaleString()})
-                  </span>
+              <div className="flex flex-col gap-2">
+                {complexityScoreLoading ? (
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-chart-3"></div>
+                    <p className="text-4xl font-bold text-muted-foreground">Calculating...</p>
+                  </div>
+                ) : (
+                  <p className={`text-4xl font-bold mb-2 ${
+                    !analysisData.relativeComplexityScore ? 'text-muted-foreground' :
+                    analysisData.relativeComplexityScore < 25 ? 'text-green-600 dark:text-green-400' :
+                    analysisData.relativeComplexityScore <= 60 ? 'text-orange-600 dark:text-orange-400' :
+                    'text-red-600 dark:text-red-400'
+                  }`} aria-label={`Complexity score: ${analysisData.relativeComplexityScore || 'Not available'} out of 100`}>
+                    {analysisData.relativeComplexityScore ? `${analysisData.relativeComplexityScore}/100` : 'N/A'}
+                  </p>
                 )}
-              </p>
-              {analysisData.metrics && (
+                <p className="text-sm text-muted-foreground mb-2">
+                  Relative to most complex agency
+                  {analysisData.complexityScore && (
+                    <span className="block text-xs opacity-75">
+                      (Raw score: {analysisData.complexityScore.toLocaleString()})
+                    </span>
+                  )}
+                </p>
+              </div>
+              {analysisData.metrics && !complexityScoreLoading && (
                 <dl className="mt-4 space-y-2 text-sm text-muted-foreground">
                   <div className="flex justify-between py-1 border-b border-border/30">
                     <dt className="font-medium">Sections:</dt>
@@ -413,13 +460,27 @@ export default function Analysis() {
         </section>
 
         {/* Cross-Cutting Analysis Section */}
-        {crossCuttingData && (
+        {(crossCuttingData || crossCuttingLoading) && (
           <section aria-labelledby="cross-cutting-heading" aria-live="polite" className="mb-12">
             <h2 id="cross-cutting-heading" className="font-heading text-3xl font-semibold mb-8 text-foreground">
               Cross-Cutting Regulatory Analysis
             </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10" role="region" aria-label="Cross-cutting analysis summary">
+            {crossCuttingLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
+                {[1, 2, 3].map((i) => (
+                  <article key={i} className="bg-card border border-border rounded-lg p-8 shadow-sm">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-chart-3"></div>
+                      <h3 className="text-xl font-semibold text-muted-foreground font-heading">Loading...</h3>
+                    </div>
+                    <div className="h-12 bg-muted rounded animate-pulse mb-2"></div>
+                    <div className="h-4 bg-muted rounded animate-pulse w-3/4"></div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10" role="region" aria-label="Cross-cutting analysis summary">
               <article className="bg-card border border-border rounded-lg p-8 shadow-sm hover:shadow-md transition-shadow duration-200">
                 <h3 className="text-xl font-semibold mb-4 text-card-foreground font-heading">Shared Titles</h3>
                 <p className="text-4xl font-bold text-chart-3 mb-2" aria-label={`Number of shared titles: ${crossCuttingData.summary.sharedTitles}`}>
@@ -513,7 +574,9 @@ export default function Analysis() {
               </article>
             </div>
 
-            {crossCuttingData.crossCuttingTitles && crossCuttingData.crossCuttingTitles.length > 0 && (
+            )}
+
+            {!crossCuttingLoading && crossCuttingData.crossCuttingTitles && crossCuttingData.crossCuttingTitles.length > 0 && (
               <section aria-labelledby="cfr-titles-heading" className="bg-card border border-border rounded-lg p-8 shadow-sm">
                 <h3 id="cfr-titles-heading" className="text-2xl font-semibold mb-6 text-card-foreground font-heading">
                   CFR Titles for {crossCuttingData.summary.agencyName}

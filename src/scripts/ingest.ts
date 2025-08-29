@@ -17,12 +17,6 @@ interface TitleWithDate {
   };
 }
 
-// interface AgencyData {
-//   name: string;
-//   description?: string;
-//   slug: string;
-// }
-
 interface TitleData {
   number: number;
   name: string;
@@ -45,14 +39,11 @@ interface SectionData {
   text: string;
 }
 
-/*
-// This function is defined but not used. Commenting out for now.
 async function fetchAgencies(): Promise<RawAgency[]> {
   const response = await fetch(`${BASE_URL}/api/admin/v1/agencies.json`);
   const data = await response.json();
   return data.agencies;
 }
-*/
 async function fetchTitles(): Promise<TitleData[]> {
   const response = await fetch(`${BASE_URL}/api/versioner/v1/titles.json`);
   const data = await response.json();
@@ -131,27 +122,21 @@ function calculateChecksum(text: string): string {
 async function ingestData() {
   console.log('Fetching agencies...');
 
-  // Get the original agency data with CFR references
-  const response = await fetch(`${BASE_URL}/api/admin/v1/agencies.json`);
-  const data = await response.json();
+  // Get all agencies from the API
+  const allAgencies = await fetchAgencies();
 
-  const targetAgencies = [
-    'Department of Agriculture',
-    'Department of Commerce',
-    // 'Department of Defense',
-    // 'Department of Justice',
-    // 'Department of Labor'
-  ];
-
-  const matchedRawAgencies = data.agencies.filter((agency: RawAgency) =>
-    targetAgencies.includes(agency.name)
+  // Filter for agencies that have CFR references (indicate regulatory activity)
+  const agenciesWithCFR = allAgencies.filter(agency =>
+    agency.cfr_references && agency.cfr_references.length > 0
   );
+
+  console.log(`Found ${agenciesWithCFR.length} agencies with CFR references out of ${allAgencies.length} total agencies`);
 
   // Create agencies in database and get their IDs
   const createdAgencies = [];
   const agencyTitleMap = new Map<string, number[]>(); // Map agency slug to their CFR title numbers
 
-  for (const rawAgency of matchedRawAgencies) {
+  for (const rawAgency of agenciesWithCFR) {
     const createdAgency = await prisma.agency.upsert({
       where: { slug: rawAgency.slug },
       update: { name: rawAgency.name, description: rawAgency.short_name },
@@ -285,75 +270,98 @@ async function ingestData() {
   console.log(`🔄 Average Agencies per Title: ${(totalTitleInstances / titlesByImpact.length).toFixed(1)}`);
   console.log('================================================\n');
 
-  console.log(`Fetching content for ${titlesWithDates.length} titles with their latest available dates...`);
+  // Group titles by unique CFR number to avoid duplicate fetching
+  const uniqueTitleMap = new Map<number, {
+    titleWithDateData: TitleWithDate['titleData'],
+    dbEntries: { dbId: number, agency: { id: number, name: string, slug: string } }[]
+  }>();
 
-  for (const { titleData } of titlesWithDates) {
+  for (const { titleData, agency } of titlesWithDates) {
+    if (!uniqueTitleMap.has(titleData.number)) {
+      uniqueTitleMap.set(titleData.number, {
+        titleWithDateData: titleData,
+        dbEntries: []
+      });
+    }
+    uniqueTitleMap.get(titleData.number)!.dbEntries.push({
+      dbId: titleData.dbId,
+      agency
+    });
+  }
+
+  console.log(`Fetching content for ${uniqueTitleMap.size} unique CFR titles...`);
+
+  for (const [titleNumber, { titleWithDateData, dbEntries }] of uniqueTitleMap.entries()) {
     // Use the most recent date available from the title data
-    const latestDate = titleData.up_to_date_as_of || titleData.latest_issue_date || titleData.latest_amended_on;
+    const latestDate = titleWithDateData.up_to_date_as_of || titleWithDateData.latest_issue_date || titleWithDateData.latest_amended_on;
 
     if (!latestDate) {
-      console.log(`No date information available for title ${titleData.number}, skipping...`);
+      console.log(`No date information available for title ${titleNumber}, skipping...`);
       continue;
     }
 
-    console.log(`Fetching data for title ${titleData.number} on ${latestDate}...`);
+    console.log(`Fetching data for CFR Title ${titleNumber} on ${latestDate} (used by ${dbEntries.length} agencies: ${dbEntries.map(e => e.agency.name).join(', ')})...`);
 
     try {
-      const structure = await fetchStructure(titleData.number.toString(), latestDate);
-      const content = await fetchContent(titleData.number.toString(), latestDate);
+      const structure = await fetchStructure(titleNumber.toString(), latestDate);
+      const content = await fetchContent(titleNumber.toString(), latestDate);
 
-      const version = await prisma.version.upsert({
-        where: {
-          titleId_date: {
-            titleId: titleData.dbId,
-            date: new Date(latestDate),
-          },
-        },
-        update: {
-          structureJson: structure,
-          contentXml: content,
-        },
-        create: {
-          titleId: titleData.dbId,
-          date: new Date(latestDate),
-          structureJson: structure,
-          contentXml: content,
-        },
-      });
-
-      // Parse sections from XML
+      // Parse sections once for this CFR title
       const sections = parseSections(content);
 
-      for (const section of sections) {
-        const text = section.text || '';
-        const wordCount = calculateWordCount(text);
-        const checksum = calculateChecksum(text);
-
-        await prisma.section.upsert({
+      // Create versions for all agency title entries that reference this CFR title
+      for (const { dbId } of dbEntries) {
+        const version = await prisma.version.upsert({
           where: {
-            versionId_identifier: {
-              versionId: version.id,
-              identifier: section.identifier,
+            titleId_date: {
+              titleId: dbId,
+              date: new Date(latestDate),
             },
           },
           update: {
-            label: section.label,
-            textContent: text,
-            wordCount,
-            checksum,
+            structureJson: structure,
+            contentXml: content,
           },
           create: {
-            versionId: version.id,
-            identifier: section.identifier,
-            label: section.label,
-            textContent: text,
-            wordCount,
-            checksum,
+            titleId: dbId,
+            date: new Date(latestDate),
+            structureJson: structure,
+            contentXml: content,
           },
         });
+
+        // Create sections for each agency's version
+        for (const section of sections) {
+          const text = section.text || '';
+          const wordCount = calculateWordCount(text);
+          const checksum = calculateChecksum(text);
+
+          await prisma.section.upsert({
+            where: {
+              versionId_identifier: {
+                versionId: version.id,
+                identifier: section.identifier,
+              },
+            },
+            update: {
+              label: section.label,
+              textContent: text,
+              wordCount,
+              checksum,
+            },
+            create: {
+              versionId: version.id,
+              identifier: section.identifier,
+              label: section.label,
+              textContent: text,
+              wordCount,
+              checksum,
+            },
+          });
+        }
       }
     } catch (error) {
-      console.error(`Error fetching data for title ${titleData.number}:`, error);
+      console.error(`Error fetching data for title ${titleNumber}:`, error);
     }
   }
 
