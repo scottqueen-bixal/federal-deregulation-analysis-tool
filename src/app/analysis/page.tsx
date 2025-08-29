@@ -73,12 +73,13 @@ export default function Analysis() {
       });
   }, []);
 
-  const fetchAnalysis = async (endpoint: string) => {
-    if (!selectedAgency) return;
+  const fetchAnalysis = async (endpoint: string, agencyId?: number) => {
+    const targetAgencyId = agencyId || selectedAgency;
+    if (!targetAgencyId) return;
 
     setLoading(true);
     try {
-      const url = `/api/analysis/${endpoint}/agency/${selectedAgency}`;
+      const url = `/api/analysis/${endpoint}/agency/${targetAgencyId}`;
       const res = await fetch(url);
       const data = await res.json();
       setAnalysisData(prev => ({ ...prev, ...data }));
@@ -114,9 +115,9 @@ export default function Analysis() {
                 setSelectedAgency(agencyId);
                 if (agencyId) {
                   fetchCrossCuttingData(agencyId);
-                  fetchAnalysis('word_count');
-                  fetchAnalysis('checksum');
-                  fetchAnalysis('complexity_score');
+                  fetchAnalysis('word_count', agencyId);
+                  fetchAnalysis('checksum', agencyId);
+                  fetchAnalysis('complexity_score', agencyId);
                 }
               }}
               className="w-full p-2 border border-gray-300 rounded-md"
