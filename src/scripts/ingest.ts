@@ -45,39 +45,14 @@ interface SectionData {
   text: string;
 }
 
-async function fetchAgencies(): Promise<AgencyData[]> {
+/*
+// This function is defined but not used. Commenting out for now.
+async function fetchAgencies(): Promise<RawAgency[]> {
   const response = await fetch(`${BASE_URL}/api/admin/v1/agencies.json`);
   const data = await response.json();
-
-  // Debug: Log a few agency names to see what's available
-  console.log('Sample agencies from API:');
-  data.agencies.slice(0, 3).forEach((agency: RawAgency, index: number) => {
-    console.log(`  ${index}: ${agency.name} (slug: ${agency.slug})`);
-  });
-
-  // Select agencies by their names - major regulatory agencies
-  const selectedNames = [
-    "Department of Agriculture",
-    "Department of Defense",
-    "Department of Commerce",
-    "Department of Labor",
-    "Department of Justice"
-  ];
-
-  const matchedAgencies = data.agencies.filter((agency: RawAgency) =>
-    selectedNames.includes(agency.name)
-  );
-
-  console.log(`Found ${matchedAgencies.length} matching agencies out of ${selectedNames.length} requested`);
-  matchedAgencies.forEach((agency: RawAgency) => console.log(`  - ${agency.name} (slug: ${agency.slug})`));
-
-  return matchedAgencies.map((agency: RawAgency) => ({
-    name: agency.name,
-    description: agency.short_name, // Use short_name as description since no description field
-    slug: agency.slug,
-  }));
+  return data.agencies;
 }
-
+*/
 async function fetchTitles(): Promise<TitleData[]> {
   const response = await fetch(`${BASE_URL}/api/versioner/v1/titles.json`);
   const data = await response.json();
@@ -256,6 +231,59 @@ async function ingestData() {
   }
 
   console.log('Titles per agency:', titleCountByAgency);
+
+  // Analyze cross-cutting administrative rules and agency impact
+  console.log('\n=== CROSS-CUTTING ADMINISTRATIVE RULES ANALYSIS ===');
+
+  const titleAgencyMap = new Map<number, string[]>();
+
+  // Build map of CFR titles to agencies that reference them
+  for (const titleData of filteredTitlesData) {
+    const agenciesForTitle: string[] = [];
+
+    for (const [agencySlug, titleNumbers] of agencyTitleMap.entries()) {
+      if (titleNumbers.includes(titleData.number)) {
+        const agency = createdAgencies.find(a => a.slug === agencySlug);
+        if (agency) {
+          agenciesForTitle.push(agency.name);
+        }
+      }
+    }
+
+    titleAgencyMap.set(titleData.number, agenciesForTitle);
+  }
+
+  // Sort titles by number of agencies (most cross-cutting first)
+  const titlesByImpact = Array.from(titleAgencyMap.entries())
+    .sort((a, b) => b[1].length - a[1].length);
+
+  console.log('\nCFR Titles by Cross-Agency Impact:');
+  titlesByImpact.forEach(([titleNum, agencies]) => {
+    const titleInfo = filteredTitlesData.find(t => t.number === titleNum);
+    const impactLevel = agencies.length >= 4 ? '🔴 HIGH IMPACT' :
+                       agencies.length >= 3 ? '🟡 MEDIUM IMPACT' :
+                       '🟢 SINGLE AGENCY';
+
+    console.log(`  ${impactLevel} CFR Title ${titleNum}: ${titleInfo?.name}`);
+    console.log(`    └─ Affects ${agencies.length} agencies: ${agencies.join(', ')}`);
+  });
+
+  // Summary statistics
+  const highImpactTitles = titlesByImpact.filter(([, agencies]) => agencies.length >= 4);
+  const mediumImpactTitles = titlesByImpact.filter(([, agencies]) => agencies.length === 3);
+  const singleAgencyTitles = titlesByImpact.filter(([, agencies]) => agencies.length <= 2);
+
+  console.log('\n=== REGULATORY IMPACT SUMMARY ===');
+  console.log(`📊 Total CFR Titles Analyzed: ${titlesByImpact.length}`);
+  console.log(`🔴 High Impact (4+ agencies): ${highImpactTitles.length} titles`);
+  console.log(`🟡 Medium Impact (3 agencies): ${mediumImpactTitles.length} titles`);
+  console.log(`🟢 Single/Low Impact (≤2 agencies): ${singleAgencyTitles.length} titles`);
+
+  const totalTitleInstances = Array.from(titleAgencyMap.values())
+    .reduce((sum, agencies) => sum + agencies.length, 0);
+  console.log(`📈 Total Title-Agency Relationships: ${totalTitleInstances}`);
+  console.log(`🔄 Average Agencies per Title: ${(totalTitleInstances / titlesByImpact.length).toFixed(1)}`);
+  console.log('================================================\n');
 
   console.log(`Fetching content for ${titlesWithDates.length} titles with their latest available dates...`);
 

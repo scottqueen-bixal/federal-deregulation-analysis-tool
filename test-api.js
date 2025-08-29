@@ -104,6 +104,12 @@ async function runTests() {
     console.log("❌ Error fetching agencies:", error.message);
   }
 
+  // Test cross-cutting analysis
+  await testEndpoint(
+    `${BASE_URL}/api/analysis/cross-cutting`,
+    "Cross-cutting administrative rules analysis"
+  );
+
   console.log("\n" + "=".repeat(60));
   console.log("API endpoint tests completed.");
 }
