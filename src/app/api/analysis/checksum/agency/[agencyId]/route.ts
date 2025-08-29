@@ -12,23 +12,32 @@ export async function GET(
   try {
     const resolvedParams = await params;
     const agencyId = parseInt(resolvedParams.agencyId);
-    const where: {
-      title?: { agencyId: number };
-      date?: Date;
+
+    // Build the where clause for sections
+    const sectionWhere: {
+      version: {
+        title: { agencyId: number };
+        date?: Date;
+      };
     } = {
-      title: {
-        agencyId,
+      version: {
+        title: {
+          agencyId,
+        },
       },
     };
 
     if (date) {
-      where.date = new Date(date);
+      sectionWhere.version.date = new Date(date);
     } else {
-      // Get latest version
+      // Get latest version that has sections
       const latestVersion = await prisma.version.findFirst({
         where: {
           title: {
             agencyId,
+          },
+          sections: {
+            some: {}, // Ensure the version has at least one section
           },
         },
         orderBy: {
@@ -36,14 +45,12 @@ export async function GET(
         },
       });
       if (latestVersion) {
-        where.date = latestVersion.date;
+        sectionWhere.version.date = latestVersion.date;
       }
     }
 
     const sections = await prisma.section.findMany({
-      where: {
-        version: where,
-      },
+      where: sectionWhere,
       select: {
         checksum: true,
       },

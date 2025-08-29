@@ -1,9 +1,9 @@
-version: '3.8'
-
 services:
   postgres:
-    image: postgres:15
+    image: postgres:15-alpine
     container_name: ecfr-postgres
+    env_file:
+      - .env
     environment:
       POSTGRES_DB: ecfr
       POSTGRES_USER: postgres
@@ -12,6 +12,33 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nextjs:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ecfr-nextjs
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=development
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    command: sh -c "npx prisma migrate deploy && npm run ingest && npm run dev"
+    stdin_open: true
+    tty: true
 
 volumes:
   postgres_data:

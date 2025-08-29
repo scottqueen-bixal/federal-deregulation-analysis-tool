@@ -56,10 +56,48 @@ async function fetchContent(title: string, date: string): Promise<string> {
   return await response.text();
 }
 
-function parseSections(_xml: string): SectionData[] {
-  // Placeholder for XML parsing
-  // In a real implementation, parse the XML to extract sections
-  return [];
+function parseSections(xml: string): SectionData[] {
+  const sections: SectionData[] = [];
+
+  try {
+    // Simple regex-based parsing for sections
+    // Look for DIV8 TYPE="SECTION" elements
+    const sectionRegex = /<DIV8[^>]*N="([^"]*)"[^>]*>[\s\S]*?<HEAD>([^<]*)<\/HEAD>([\s\S]*?)<\/DIV8>/g;
+    let match;
+
+    while ((match = sectionRegex.exec(xml)) !== null) {
+      const identifier = match[1];
+      const head = match[2].replace(/^§\s*/, '').trim();
+      const content = match[3];
+
+      // Extract text from P elements
+      const textRegex = /<P[^>]*>([\s\S]*?)<\/P>/g;
+      let textContent = '';
+      let textMatch;
+
+      while ((textMatch = textRegex.exec(content)) !== null) {
+        let text = textMatch[1];
+        // Remove nested tags
+        text = text.replace(/<[^>]*>/g, '');
+        textContent += text + ' ';
+      }
+
+      // Clean up the text
+      textContent = textContent.replace(/\s+/g, ' ').trim();
+
+      if (textContent) {
+        sections.push({
+          identifier,
+          label: head,
+          text: textContent
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Error parsing XML:', error);
+  }
+
+  return sections;
 }
 
 function calculateWordCount(text: string): number {
@@ -106,7 +144,8 @@ async function ingestData() {
   const titles = await prisma.title.findMany();
 
   for (const title of titles) {
-    const date = new Date().toISOString().split('T')[0]; // Today's date
+    // Use the latest available date from the API
+    const date = '2025-08-27';
 
     console.log(`Fetching data for title ${title.code} on ${date}...`);
 
@@ -114,8 +153,18 @@ async function ingestData() {
       const structure = await fetchStructure(title.code, date);
       const content = await fetchContent(title.code, date);
 
-      const version = await prisma.version.create({
-        data: {
+      const version = await prisma.version.upsert({
+        where: {
+          titleId_date: {
+            titleId: title.id,
+            date: new Date(date),
+          },
+        },
+        update: {
+          structureJson: structure,
+          contentXml: content,
+        },
+        create: {
           titleId: title.id,
           date: new Date(date),
           structureJson: structure,
@@ -131,8 +180,20 @@ async function ingestData() {
         const wordCount = calculateWordCount(text);
         const checksum = calculateChecksum(text);
 
-        await prisma.section.create({
-          data: {
+        await prisma.section.upsert({
+          where: {
+            versionId_identifier: {
+              versionId: version.id,
+              identifier: section.identifier,
+            },
+          },
+          update: {
+            label: section.label,
+            textContent: text,
+            wordCount,
+            checksum,
+          },
+          create: {
             versionId: version.id,
             identifier: section.identifier,
             label: section.label,

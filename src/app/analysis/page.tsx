@@ -29,11 +29,26 @@ export default function Analysis() {
   const [date, setDate] = useState('');
   const [analysisData, setAnalysisData] = useState<AnalysisData>({});
   const [loading, setLoading] = useState(false);
+  const [agenciesLoading, setAgenciesLoading] = useState(true);
 
   useEffect(() => {
     fetch('/api/data/agencies')
       .then(res => res.json())
-      .then(data => setAgencies(data.agencies));
+      .then(data => {
+        if (data.agencies && Array.isArray(data.agencies)) {
+          setAgencies(data.agencies);
+        } else {
+          console.error('Invalid agencies data:', data);
+          setAgencies([]);
+        }
+      })
+      .catch(error => {
+        console.error('Error fetching agencies:', error);
+        setAgencies([]);
+      })
+      .finally(() => {
+        setAgenciesLoading(false);
+      });
   }, []);
 
   const fetchAnalysis = async (endpoint: string) => {
@@ -70,9 +85,12 @@ export default function Analysis() {
               value={selectedAgency || ''}
               onChange={(e) => setSelectedAgency(parseInt(e.target.value))}
               className="w-full p-2 border border-gray-300 rounded-md"
+              disabled={agenciesLoading}
             >
-              <option value="">Choose an agency...</option>
-              {agencies.map(agency => (
+              <option value="">
+                {agenciesLoading ? 'Loading agencies...' : 'Choose an agency...'}
+              </option>
+              {Array.isArray(agencies) && agencies.map(agency => (
                 <option key={agency.id} value={agency.id}>
                   {agency.name}
                 </option>
