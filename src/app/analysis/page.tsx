@@ -138,25 +138,25 @@ export default function Analysis() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="p-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
             <h3 className="text-xl font-semibold mb-4">Word Count</h3>
-            <p className="text-3xl font-bold text-blue-600">
+            <p className="text-3xl font-bold text-blue-700 dark:text-blue-400">
               {analysisData.wordCount?.toLocaleString() || 'N/A'}
             </p>
           </div>
 
           <div className="p-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
             <h3 className="text-xl font-semibold mb-4">Checksum</h3>
-            <p className="text-sm font-mono break-all">
+            <p className="text-sm font-mono break-all text-gray-900 dark:text-gray-100">
               {analysisData.checksum || 'N/A'}
             </p>
           </div>
 
           <div className="p-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
             <h3 className="text-xl font-semibold mb-4">Complexity Score</h3>
-            <p className="text-3xl font-bold text-green-600">
+            <p className="text-3xl font-bold text-green-700 dark:text-green-400">
               {analysisData.complexityScore?.toFixed(2) || 'N/A'}
             </p>
             {analysisData.metrics && (
-              <div className="mt-2 text-sm text-gray-600">
+              <div className="mt-2 text-sm text-gray-700 dark:text-gray-300">
                 <p>Sections: {analysisData.metrics.totalSections}</p>
                 <p>Total Words: {analysisData.metrics.totalWords}</p>
                 <p>Avg Words/Section: {analysisData.metrics.avgWordsPerSection?.toFixed(1)}</p>
@@ -173,30 +173,30 @@ export default function Analysis() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
               <div className="p-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
                 <h3 className="text-xl font-semibold mb-4">Shared Titles</h3>
-                <p className="text-3xl font-bold text-purple-600">
+                <p className="text-3xl font-bold text-purple-700 dark:text-purple-400">
                   {crossCuttingData.summary.sharedTitles}
                 </p>
-                <p className="text-sm text-gray-600 mt-2">
+                <p className="text-sm text-gray-700 dark:text-gray-300 mt-2">
                   CFR titles affecting multiple agencies
                 </p>
               </div>
 
               <div className="p-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
                 <h3 className="text-xl font-semibold mb-4">Shared With Agencies</h3>
-                <p className="text-3xl font-bold text-orange-600">
+                <p className="text-3xl font-bold text-orange-700 dark:text-orange-400">
                   {crossCuttingData.summary.sharedWithAgencies}
                 </p>
-                <p className="text-sm text-gray-600 mt-2">
+                <p className="text-sm text-gray-700 dark:text-gray-300 mt-2">
                   Other agencies sharing regulations
                 </p>
               </div>
 
               <div className="p-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
                 <h3 className="text-xl font-semibold mb-4">Cross-Cutting Percentage</h3>
-                <p className="text-3xl font-bold text-green-600">
+                <p className="text-3xl font-bold text-green-700 dark:text-green-400">
                   {crossCuttingData.summary.crossCuttingPercentage.toFixed(1)}%
                 </p>
-                <p className="text-sm text-gray-600 mt-2">
+                <p className="text-sm text-gray-700 dark:text-gray-300 mt-2">
                   {crossCuttingData.summary.highImpactShared} high-impact shared titles
                 </p>
               </div>
@@ -207,24 +207,24 @@ export default function Analysis() {
                 <h3 className="text-xl font-semibold mb-4">CFR Titles for {crossCuttingData.summary.agencyName}</h3>
                 <div className="space-y-3">
                   {crossCuttingData.crossCuttingTitles.map((title, index) => (
-                    <div key={`title-${index}`} className="border-l-4 border-blue-500 pl-4">
+                    <div key={`title-${index}`} className="border-l-4 border-blue-600 pl-4">
                       <div className="flex justify-between items-start">
                         <div>
-                          <h4 className="font-semibold">Title {title.cfrNumber}: {title.name}</h4>
-                          <p className="text-sm text-gray-600 mt-1">
+                          <h4 className="font-semibold text-gray-900 dark:text-gray-100">Title {title.cfrNumber}: {title.name}</h4>
+                          <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
                             {title.isShared ? `Shared with ${title.agencyCount - 1} other agencies` : 'Exclusive to this agency'}
                           </p>
                         </div>
                         <div className="flex space-x-2">
                           <span className={`px-2 py-1 text-xs font-semibold rounded ${
-                            title.impactLevel === 'HIGH' ? 'bg-red-100 text-red-800' :
-                            title.impactLevel === 'MEDIUM' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-green-100 text-green-800'
+                            title.impactLevel === 'HIGH' ? 'bg-red-200 text-red-900 dark:bg-red-800 dark:text-red-100' :
+                            title.impactLevel === 'MEDIUM' ? 'bg-yellow-200 text-yellow-900 dark:bg-yellow-800 dark:text-yellow-100' :
+                            'bg-green-200 text-green-900 dark:bg-green-800 dark:text-green-100'
                           }`}>
                             {title.impactLevel}
                           </span>
                           {title.isShared && (
-                            <span className="px-2 py-1 text-xs font-semibold rounded bg-blue-100 text-blue-800">
+                            <span className="px-2 py-1 text-xs font-semibold rounded bg-blue-200 text-blue-900 dark:bg-blue-800 dark:text-blue-100">
                               SHARED
                             </span>
                           )}
@@ -232,7 +232,7 @@ export default function Analysis() {
                       </div>
                       {title.isShared && title.sharedWith.length > 0 && (
                         <div className="mt-2 text-sm">
-                          <p className="text-gray-700">
+                          <p className="text-gray-800 dark:text-gray-200">
                             <strong>Shared with:</strong> {title.sharedWith.map(agency => agency.name).join(', ')}
                           </p>
                         </div>
