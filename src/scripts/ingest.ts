@@ -141,57 +141,103 @@ function calculateChecksum(text: string): string {
 
 async function ingestData() {
   console.log('Fetching agencies...');
-  const agencies = await fetchAgencies();
+
+  // Get the original agency data with CFR references
+  const response = await fetch(`${BASE_URL}/api/admin/v1/agencies.json`);
+  const data = await response.json();
+
+  const targetAgencies = [
+    'Department of Agriculture',
+    'Department of Commerce',
+    'Department of Defense',
+    'Department of Justice',
+    'Department of Labor'
+  ];
+
+  const matchedRawAgencies = data.agencies.filter((agency: RawAgency) =>
+    targetAgencies.includes(agency.name)
+  );
 
   // Create agencies in database and get their IDs
   const createdAgencies = [];
-  for (const agency of agencies) {
+  const agencyTitleMap = new Map<string, number[]>(); // Map agency slug to their CFR title numbers
+
+  for (const rawAgency of matchedRawAgencies) {
     const createdAgency = await prisma.agency.upsert({
-      where: { slug: agency.slug },
-      update: { name: agency.name, description: agency.description },
+      where: { slug: rawAgency.slug },
+      update: { name: rawAgency.name, description: rawAgency.short_name },
       create: {
-        name: agency.name,
-        description: agency.description,
-        slug: agency.slug,
+        name: rawAgency.name,
+        description: rawAgency.short_name,
+        slug: rawAgency.slug,
       },
     });
     createdAgencies.push(createdAgency);
+
+    // Get CFR title references for this agency
+    const titleNumbers = rawAgency.cfr_references?.map((ref: { title: number; chapter: string }) => ref.title) || [];
+    agencyTitleMap.set(rawAgency.slug, titleNumbers);
+    console.log(`${rawAgency.name} references CFR titles: ${titleNumbers.join(', ')}`);
   }
 
   console.log('Fetching titles...');
   const titlesData = await fetchTitles();
 
-  // Since ECFR API doesn't directly map titles to agencies, we'll need to
-  // assign titles to agencies based on CFR references or use a simpler approach
-  // For now, let's distribute titles evenly among our selected agencies
-  console.log(`Processing ${titlesData.length} titles for ${createdAgencies.length} selected agencies`);
+  // Get all title numbers that are referenced by our selected agencies
+  const referencedTitleNumbers = new Set<number>();
+  agencyTitleMap.forEach((titleNumbers: number[]) => {
+    titleNumbers.forEach((titleNum: number) => referencedTitleNumbers.add(titleNum));
+  });
+
+  // Filter titles to only include those referenced by our selected agencies
+  const filteredTitlesData = titlesData.filter(titleData =>
+    referencedTitleNumbers.has(titleData.number)
+  );
+
+  console.log(`Found ${referencedTitleNumbers.size} unique CFR titles referenced by our agencies`);
+  console.log(`Processing ${filteredTitlesData.length} relevant titles for ${createdAgencies.length} selected agencies`);
 
   // Log title count per agency for debugging
   const titleCountByAgency: Record<string, number> = {};
 
-  let agencyIndex = 0;
-  for (const titleData of titlesData) {
-    const agency = createdAgencies[agencyIndex % createdAgencies.length];
+  for (const titleData of filteredTitlesData) {
+    // Find which agency(ies) reference this title
+    let assignedAgency = null;
 
-    titleCountByAgency[agency.name] = (titleCountByAgency[agency.name] || 0) + 1;
+    for (const [agencySlug, titleNumbers] of agencyTitleMap.entries()) {
+      if (titleNumbers.includes(titleData.number)) {
+        assignedAgency = createdAgencies.find(a => a.slug === agencySlug);
+        break; // Assign to first matching agency if multiple agencies reference the same title
+      }
+    }
 
-    await prisma.title.upsert({
-      where: { code: titleData.number.toString() },
-      update: { name: titleData.name },
-      create: {
-        code: titleData.number.toString(),
-        name: titleData.name,
-        agencyId: agency.id,
-      },
-    });
+    if (assignedAgency) {
+      titleCountByAgency[assignedAgency.name] = (titleCountByAgency[assignedAgency.name] || 0) + 1;
 
-    agencyIndex++;
+      await prisma.title.upsert({
+        where: { code: titleData.number.toString() },
+        update: { name: titleData.name },
+        create: {
+          code: titleData.number.toString(),
+          name: titleData.name,
+          agencyId: assignedAgency.id,
+        },
+      });
+    }
   }
 
   console.log('Titles per agency:', titleCountByAgency);
 
-  // For each title, fetch latest data
-  const titles = await prisma.title.findMany();
+  // For each title we just processed, fetch latest data
+  const titles = await prisma.title.findMany({
+    where: {
+      agencyId: {
+        in: createdAgencies.map(agency => agency.id)
+      }
+    }
+  });
+
+  console.log(`Fetching content for ${titles.length} titles that belong to our selected agencies...`);
 
   for (const title of titles) {
     // Use the latest available date from the API
