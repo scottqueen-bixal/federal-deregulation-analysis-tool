@@ -16,6 +16,7 @@ interface AnalysisData {
     totalSections: number;
     totalWords: number;
     avgWordsPerSection: number;
+    hierarchyDepth?: number;
   };
 }
 
@@ -49,12 +50,66 @@ export default function Analysis() {
   const [agencies, setAgencies] = useState<Agency[]>([]);
   const [selectedAgency, setSelectedAgency] = useState<number | null>(null);
   const [analysisData, setAnalysisData] = useState<AnalysisData>({});
-  const [crossCuttingData, setCrossCuttingData] = useState<CrossCuttingData | null>(null);
+  const [crossCuttingData, setCrossCuttingData] = useState<CrossCuttingData>({
+    summary: {
+      agencyName: '',
+      totalCfrTitles: 0,
+      sharedTitles: 0,
+      exclusiveTitles: 0,
+      highImpactShared: 0,
+      sharedWithAgencies: 0,
+      crossCuttingPercentage: 0,
+    },
+    crossCuttingTitles: [],
+    selectedAgency: { id: 0, name: '', slug: '' },
+  });
   const [agenciesLoading, setAgenciesLoading] = useState(true);
   const [showWordCountTooltip, setShowWordCountTooltip] = useState(false);
   const [showChecksumTooltip, setShowChecksumTooltip] = useState(false);
   const [showComplexityTooltip, setShowComplexityTooltip] = useState(false);
   const [showCrossCuttingTooltip, setShowCrossCuttingTooltip] = useState(false);
+
+  // Calculate cross-cutting severity score based on multiple factors
+  const calculateCrossCuttingSeverity = (
+    summary: CrossCuttingData['summary'],
+    crossCuttingTitles: CrossCuttingData['crossCuttingTitles']
+  ) => {
+    if (!crossCuttingTitles.length) return { score: 0, level: 'MINIMAL' as const };
+
+    // Factor 1: Impact distribution (weighted by impact level)
+    const impactScore = crossCuttingTitles.reduce((score: number, title) => {
+      if (title.impactLevel === 'HIGH') return score + 3;
+      if (title.impactLevel === 'MEDIUM') return score + 2;
+      return score + 1; // LOW
+    }, 0);
+
+    // Factor 2: Agency breadth (more agencies = higher complexity)
+    const agencyBreadthScore = Math.min(summary.sharedWithAgencies * 2, 10); // Cap at 10
+
+    // Factor 3: Regulatory density (percentage of shared titles)
+    const densityScore = (summary.sharedTitles / summary.totalCfrTitles) * 10;
+
+    // Factor 4: High-impact concentration (bonus for multiple high-impact titles)
+    const highImpactBonus = summary.highImpactShared > 1 ? summary.highImpactShared * 1.5 : 0;
+
+    // Weighted final score (max ~30)
+    const rawScore = (impactScore * 0.4) + (agencyBreadthScore * 0.3) + (densityScore * 0.2) + (highImpactBonus * 0.1);
+
+    // Normalize to 0-100 scale
+    const normalizedScore = Math.min((rawScore / 30) * 100, 100);
+
+    // Determine severity level
+    let level: 'MINIMAL' | 'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL';
+    if (normalizedScore < 15) level = 'MINIMAL';
+    else if (normalizedScore < 35) level = 'LOW';
+    else if (normalizedScore < 60) level = 'MODERATE';
+    else if (normalizedScore < 80) level = 'HIGH';
+    else level = 'CRITICAL';
+
+    return { score: Math.round(normalizedScore), level };
+  };
+
+  const crossCuttingSeverity = calculateCrossCuttingSeverity(crossCuttingData.summary, crossCuttingData.crossCuttingTitles);
 
   useEffect(() => {
     fetch('/api/data/agencies')
@@ -276,24 +331,27 @@ export default function Analysis() {
                       <div className="text-sm text-gray-900">
                         <h4 className="font-semibold mb-2 text-gray-900">Complexity Score Calculation</h4>
                         <p className="mb-3 text-gray-800">
-                          Measures regulatory complexity based on document structure and content density.
+                          Multi-factor score measuring regulatory complexity based on document structure and content density.
                         </p>
                         <ul className="list-disc list-inside mb-3 space-y-1 text-gray-700">
-                          <li>Average words per section</li>
                           <li>Number of regulatory sections</li>
-                          <li>Cross-references and citations</li>
-                          <li>Technical terminology density</li>
+                          <li>Average words per section (scaled)</li>
+                          <li>Document hierarchy depth analysis</li>
+                          <li>Structural complexity multiplier</li>
                         </ul>
+                        <p className="text-gray-700 mb-2">
+                          <strong className="text-gray-900">Formula:</strong> Base complexity × Hierarchy multiplier
+                        </p>
                         <p className="text-gray-700 mb-2">
                           <strong className="text-gray-900">Score ranges:</strong>
                         </p>
                         <ul className="list-disc list-inside mb-3 space-y-1 text-gray-700 ml-4">
-                          <li className="text-green-600"><strong>Under 20:</strong> Low complexity</li>
-                          <li className="text-orange-600"><strong>20-50:</strong> Moderate complexity</li>
-                          <li className="text-red-600"><strong>Above 50:</strong> High complexity</li>
+                          <li className="text-green-600"><strong>Under 200:</strong> Low complexity</li>
+                          <li className="text-orange-600"><strong>200-500:</strong> Moderate complexity</li>
+                          <li className="text-red-600"><strong>Above 500:</strong> High complexity</li>
                         </ul>
                         <p className="text-gray-700">
-                          <strong className="text-gray-900">Why it matters:</strong> Higher scores indicate regulations that may be difficult to understand and comply with, making them prime candidates for simplification.
+                          <strong className="text-gray-900">Why it matters:</strong> Higher scores indicate regulations with complex navigation and compliance requirements, making them prime candidates for simplification.
                         </p>
                       </div>
                       {/* Tooltip arrow */}
@@ -305,8 +363,8 @@ export default function Analysis() {
               </div>
               <p className={`text-4xl font-bold mb-2 ${
                 !analysisData.complexityScore ? 'text-muted-foreground' :
-                analysisData.complexityScore < 20 ? 'text-green-600 dark:text-green-400' :
-                analysisData.complexityScore <= 50 ? 'text-orange-600 dark:text-orange-400' :
+                analysisData.complexityScore < 200 ? 'text-green-600 dark:text-green-400' :
+                analysisData.complexityScore <= 500 ? 'text-orange-600 dark:text-orange-400' :
                 'text-red-600 dark:text-red-400'
               }`} aria-label={`Complexity score: ${analysisData.complexityScore?.toFixed(2) || 'Not available'}`}>
                 {analysisData.complexityScore?.toFixed(2) || 'N/A'}
@@ -321,9 +379,13 @@ export default function Analysis() {
                     <dt className="font-medium">Total Words:</dt>
                     <dd className="text-card-foreground">{analysisData.metrics.totalWords}</dd>
                   </div>
-                  <div className="flex justify-between py-1">
+                  <div className="flex justify-between py-1 border-b border-border/30">
                     <dt className="font-medium">Avg Words/Section:</dt>
                     <dd className="text-card-foreground">{analysisData.metrics.avgWordsPerSection?.toFixed(1)}</dd>
+                  </div>
+                  <div className="flex justify-between py-1">
+                    <dt className="font-medium">Hierarchy Depth:</dt>
+                    <dd className="text-card-foreground">{analysisData.metrics.hierarchyDepth || 'N/A'}</dd>
                   </div>
                 </dl>
               )}
@@ -379,23 +441,26 @@ export default function Analysis() {
                         <div className="text-sm text-gray-900">
                           <h4 className="font-semibold mb-2 text-gray-900">Cross-Cutting Impact Analysis</h4>
                           <p className="mb-3 text-gray-800">
-                            Evaluates how regulations interact with and impact other agencies or regulatory domains.
+                            Multi-factor severity score evaluating regulatory complexity across agencies.
                           </p>
                           <ul className="list-disc list-inside mb-3 space-y-1 text-gray-700">
-                            <li>Inter-agency regulatory overlap</li>
-                            <li>Shared enforcement responsibilities</li>
-                            <li>Cross-sector compliance requirements</li>
-                            <li>Multi-jurisdictional implications</li>
+                            <li>Impact level distribution (HIGH/MEDIUM/LOW)</li>
+                            <li>Number of agencies involved</li>
+                            <li>Regulatory density (shared vs. exclusive)</li>
+                            <li>High-impact concentration bonus</li>
                           </ul>
                           <p className="text-gray-700 mb-2">
-                            <strong className="text-gray-900">Badges indicate:</strong>
+                            <strong className="text-gray-900">Severity levels:</strong>
                           </p>
                           <ul className="list-disc list-inside mb-3 space-y-1 text-gray-700 ml-4">
-                            <li><span className="inline-block w-3 h-3 bg-red-600 rounded-full mr-2"></span><strong>High Impact:</strong> Significant cross-agency effects</li>
-                            <li><span className="inline-block w-3 h-3 bg-orange-600 rounded-full mr-2"></span><strong>Shared Authority:</strong> Multiple agencies involved</li>
+                            <li className="text-gray-600"><strong>MINIMAL (0-14):</strong> Limited cross-agency impact</li>
+                            <li className="text-green-600"><strong>LOW (15-34):</strong> Minor overlap concerns</li>
+                            <li className="text-yellow-600"><strong>MODERATE (35-59):</strong> Significant coordination needed</li>
+                            <li className="text-orange-600"><strong>HIGH (60-79):</strong> Complex inter-agency effects</li>
+                            <li className="text-red-600"><strong>CRITICAL (80+):</strong> Major bureaucratic entanglement</li>
                           </ul>
                           <p className="text-gray-700">
-                            <strong className="text-gray-900">Why it matters:</strong> Understanding cross-cutting impacts helps identify regulations that require coordinated reform efforts and potential bureaucratic conflicts.
+                            <strong className="text-gray-900">Why it matters:</strong> Higher scores indicate regulations requiring coordinated reform efforts and potential sources of bureaucratic inefficiency.
                           </p>
                         </div>
                         {/* Tooltip arrow */}
@@ -406,11 +471,22 @@ export default function Analysis() {
                   </div>
                 </div>
                 <p className={`text-4xl font-bold mb-2 ${
-                  crossCuttingData.summary.crossCuttingPercentage < 20 ? 'text-green-600 dark:text-green-400' :
-                  crossCuttingData.summary.crossCuttingPercentage <= 50 ? 'text-orange-600 dark:text-orange-400' :
+                  crossCuttingSeverity.level === 'MINIMAL' ? 'text-gray-500 dark:text-gray-400' :
+                  crossCuttingSeverity.level === 'LOW' ? 'text-green-600 dark:text-green-400' :
+                  crossCuttingSeverity.level === 'MODERATE' ? 'text-yellow-600 dark:text-yellow-400' :
+                  crossCuttingSeverity.level === 'HIGH' ? 'text-orange-600 dark:text-orange-400' :
                   'text-red-600 dark:text-red-400'
-                }`} aria-label={`Cross-cutting percentage: ${crossCuttingData.summary.crossCuttingPercentage.toFixed(1)} percent`}>
-                  {crossCuttingData.summary.crossCuttingPercentage.toFixed(1)}%
+                }`} aria-label={`Cross-cutting severity score: ${crossCuttingSeverity.score} out of 100, ${crossCuttingSeverity.level.toLowerCase()} impact`}>
+                  {crossCuttingSeverity.score}
+                </p>
+                <p className="text-sm text-muted-foreground mb-1">
+                  Severity: <span className={`font-semibold ${
+                    crossCuttingSeverity.level === 'MINIMAL' ? 'text-gray-600' :
+                    crossCuttingSeverity.level === 'LOW' ? 'text-green-600' :
+                    crossCuttingSeverity.level === 'MODERATE' ? 'text-yellow-600' :
+                    crossCuttingSeverity.level === 'HIGH' ? 'text-orange-600' :
+                    'text-red-600'
+                  }`}>{crossCuttingSeverity.level}</span>
                 </p>
                 <p className="text-sm text-muted-foreground">
                   {crossCuttingData.summary.highImpactShared} high-impact shared titles

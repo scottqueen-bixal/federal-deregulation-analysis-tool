@@ -52,6 +52,12 @@ export async function GET(
       where: sectionWhere,
       select: {
         wordCount: true,
+        identifier: true,
+        version: {
+          select: {
+            structureJson: true,
+          },
+        },
       },
     });
 
@@ -59,10 +65,70 @@ export async function GET(
     const totalWords = sections.reduce((sum, s) => sum + s.wordCount, 0);
     const avgWordsPerSection = totalSections > 0 ? totalWords / totalSections : 0;
 
-    // For hierarchy depth, we can use the structureJson, but for simplicity, assume depth 1
-    const hierarchyDepth = 1; // Placeholder
+    // Calculate dynamic hierarchy depth based on section identifiers and structure
+    const calculateHierarchyDepth = (
+      sections: Array<{ identifier: string; version?: { structureJson: unknown } | null }>,
+      structureJson: unknown
+    ) => {
+      if (!sections.length) return 1;
 
-    const complexityScore = (totalSections + avgWordsPerSection) / hierarchyDepth;
+      // Method 1: Analyze section identifiers (e.g., "1.1.1.1" has depth 4)
+      const maxIdentifierDepth = Math.max(...sections.map(section => {
+        const identifier = section.identifier || '';
+        // Count dots and other hierarchy indicators
+        const dotDepth = (identifier.match(/\./g) || []).length + 1;
+        const dashDepth = (identifier.match(/-/g) || []).length + 1;
+        const parenDepth = (identifier.match(/\([a-zA-Z0-9]+\)/g) || []).length;
+
+        return Math.max(dotDepth, dashDepth) + parenDepth;
+      }));
+
+      // Method 2: Analyze structure JSON if available
+      let structureDepth = 1;
+      if (structureJson && typeof structureJson === 'object') {
+        const calculateJsonDepth = (obj: unknown, currentDepth = 1): number => {
+          let maxDepth = currentDepth;
+
+          if (Array.isArray(obj)) {
+            for (const item of obj) {
+              maxDepth = Math.max(maxDepth, calculateJsonDepth(item, currentDepth));
+            }
+          } else if (obj && typeof obj === 'object') {
+            const objRecord = obj as Record<string, unknown>;
+            for (const key of Object.keys(objRecord)) {
+              if (key.includes('section') || key.includes('part') || key.includes('subpart') ||
+                  key.includes('chapter') || key.includes('title') || key.includes('subsection')) {
+                maxDepth = Math.max(maxDepth, calculateJsonDepth(objRecord[key], currentDepth + 1));
+              } else {
+                maxDepth = Math.max(maxDepth, calculateJsonDepth(objRecord[key], currentDepth));
+              }
+            }
+          }
+
+          return maxDepth;
+        };
+
+        structureDepth = calculateJsonDepth(structureJson);
+      }
+
+      // Use the maximum of both methods, with reasonable bounds
+      const hierarchyDepth = Math.max(maxIdentifierDepth, structureDepth);
+      return Math.min(Math.max(hierarchyDepth, 1), 10); // Bound between 1 and 10
+    };
+
+    // Get structure from first section's version (they should all be the same)
+    const structureJson = sections.length > 0 ? sections[0].version?.structureJson : null;
+    const hierarchyDepth = calculateHierarchyDepth(sections, structureJson);
+
+    // Enhanced complexity score calculation
+    // Base complexity from document size and structure
+    const baseComplexity = totalSections + (avgWordsPerSection / 10); // Scale down words
+
+    // Hierarchy multiplier: deeper structures are more complex to navigate
+    const hierarchyMultiplier = 1 + (hierarchyDepth - 1) * 0.3; // 30% increase per level
+
+    // Final complexity score
+    const complexityScore = baseComplexity * hierarchyMultiplier;
 
     return NextResponse.json({
       agencyId,
