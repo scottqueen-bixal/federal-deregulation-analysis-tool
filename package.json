@@ -9,6 +9,8 @@
     "start": "next start",
     "lint": "eslint",
     "ingest": "tsx src/scripts/ingest.ts",
+    "ingest:test": "tsx src/scripts/ingest.ts -- --max-agencies=2",
+    "ingest:all": "tsx src/scripts/ingest.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push"
