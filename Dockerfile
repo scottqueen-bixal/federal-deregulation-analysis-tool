@@ -16,6 +16,9 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+# Set execute permissions for entrypoint scripts
+RUN chmod +x entrypoint.sh
+
 # Clean any existing Prisma client and generate new one
 RUN rm -rf src/generated/prisma && DATABASE_URL="postgresql://postgres:password@localhost:5432/ecfr" npx prisma generate
 
