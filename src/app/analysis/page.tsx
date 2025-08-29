@@ -520,13 +520,7 @@ export default function Analysis() {
                 </h3>
                 <ul className="space-y-6" role="list" aria-label="List of CFR titles and their sharing status">
                   {crossCuttingData.crossCuttingTitles.map((title, index) => (
-                    <li key={`title-${index}`} className={`border-l-4 pl-6 py-4 bg-accent/20 rounded-r-lg hover:bg-accent/30 transition-colors duration-200 ${
-                      title.impactLevel === 'HIGH' ?
-                        'border-red-200 dark:border-red-800' :
-                      title.impactLevel === 'MEDIUM' ?
-                        'border-yellow-200 dark:border-yellow-800' :
-                        'border-green-200 dark:border-green-800'
-                    }`}>
+                    <li key={`title-${index}`} className="border-l-4 border-chart-1 pl-6 py-4 bg-accent/20 rounded-r-lg hover:bg-accent/30 transition-colors duration-200">
                       <article className="flex justify-between items-start">
                         <div className="flex-1 pr-4">
                           <h4 className="text-lg font-semibold text-card-foreground mb-2 font-heading">
