@@ -1,0 +1,59 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Agency {
+  id          Int     @id @default(autoincrement())
+  name        String
+  description String?
+  slug        String  @unique
+  titles      Title[]
+
+  @@map("agencies")
+}
+
+model Title {
+  id       Int     @id @default(autoincrement())
+  code     String  @unique
+  name     String
+  agencyId Int
+  agency   Agency  @relation(fields: [agencyId], references: [id])
+  versions Version[]
+
+  @@map("titles")
+}
+
+model Version {
+  id            Int      @id @default(autoincrement())
+  titleId       Int
+  date          DateTime
+  structureJson Json
+  contentXml    String
+  title         Title    @relation(fields: [titleId], references: [id])
+  sections      Section[]
+
+  @@unique([titleId, date])
+  @@map("versions")
+}
+
+model Section {
+  id          Int     @id @default(autoincrement())
+  versionId   Int
+  identifier  String
+  label       String
+  textContent String
+  wordCount   Int
+  checksum    String
+  version     Version @relation(fields: [versionId], references: [id])
+
+  @@map("sections")
+}
