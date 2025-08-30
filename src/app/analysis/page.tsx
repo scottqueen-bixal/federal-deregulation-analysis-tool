@@ -348,14 +348,15 @@ export default function Analysis() {
                       const childAgencies = agencies.filter(agency => agency.parentId);
 
                       const renderOptions: JSX.Element[] = [];
+                      const independentAgencies: JSX.Element[] = [];
 
-                      // First render independent agencies (no parent)
+                      // Process parent agencies
                       parentAgencies.forEach(agency => {
                         // Check if this agency has children
                         const children = childAgencies.filter(child => child.parentId === agency.id);
 
                         if (children.length > 0) {
-                          // This is a parent agency with children
+                          // This is a parent agency with children - create an optgroup
                           renderOptions.push(
                             <optgroup key={`parent-${agency.id}`} label={agency.name}>
                               <option key={agency.id} value={agency.id} className="text-foreground font-medium">
@@ -369,14 +370,23 @@ export default function Analysis() {
                             </optgroup>
                           );
                         } else {
-                          // This is an independent agency
-                          renderOptions.push(
+                          // This is an independent agency - add to independent list
+                          independentAgencies.push(
                             <option key={agency.id} value={agency.id} className="text-foreground">
                               {agency.name}
                             </option>
                           );
                         }
                       });
+
+                      // Add independent agencies as a group if there are any
+                      if (independentAgencies.length > 0) {
+                        renderOptions.push(
+                          <optgroup key="independent-agencies" label="Independent Agencies">
+                            {independentAgencies}
+                          </optgroup>
+                        );
+                      }
 
                       return renderOptions;
                     })()}
