@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma';
 import * as crypto from 'crypto';
+import * as xml2js from 'xml2js';
 
 const BASE_URL = 'https://www.ecfr.gov';
 
@@ -67,7 +68,121 @@ async function fetchContent(title: string, date: string): Promise<string> {
   return await response.text();
 }
 
+interface XMLElement {
+  [key: string]: unknown;
+  TYPE?: string;
+  N?: string;
+  HEAD?: string | { _: string };
+  P?: unknown | unknown[];
+  _?: string;
+}
+
 function parseSections(xml: string): SectionData[] {
+  const sections: SectionData[] = [];
+
+  try {
+    // Use xml2js parser for proper XML parsing
+    const parser = new xml2js.Parser({
+      explicitArray: false,
+      ignoreAttrs: false,
+      mergeAttrs: true
+    });
+
+    parser.parseString(xml, (err: Error | null, result: XMLElement) => {
+      if (err) {
+        console.error('Error parsing XML with xml2js:', err);
+        return;
+      }
+
+      // Navigate the XML structure to find sections
+      // The structure may vary, but typically sections are in DIV8 elements
+      const findSections = (obj: unknown, path: string = '') => {
+        if (!obj || typeof obj !== 'object') return;
+
+        const element = obj as XMLElement;
+
+        // Check if this is a section element (DIV8 with TYPE="SECTION")
+        if (element.TYPE === 'SECTION' && element.N) {
+          const identifier = element.N;
+
+          // Extract the section label from HEAD element
+          let label = '';
+          if (element.HEAD) {
+            label = typeof element.HEAD === 'string' ? element.HEAD : (element.HEAD as { _: string })?._ || '';
+            label = label.replace(/^§\s*/, '').trim();
+          }
+
+          // Extract text content from all P elements
+          let textContent = '';
+          const extractText = (el: unknown): string => {
+            if (typeof el === 'string') {
+              return el;
+            }
+            if (Array.isArray(el)) {
+              return el.map(extractText).join(' ');
+            }
+            if (el && typeof el === 'object') {
+              const elObj = el as XMLElement;
+              if (elObj._) {
+                return elObj._;
+              }
+              return Object.values(elObj).map(extractText).join(' ');
+            }
+            return '';
+          };
+
+          if (element.P) {
+            if (Array.isArray(element.P)) {
+              textContent = element.P.map(extractText).join(' ');
+            } else {
+              textContent = extractText(element.P);
+            }
+          } else {
+            // If no P elements, extract all text content
+            textContent = extractText(element);
+          }
+
+          // Clean up the text
+          textContent = textContent
+            .replace(/\s+/g, ' ')
+            .trim()
+            .replace(/\n/g, ' ')
+            .replace(/\t/g, ' ');
+
+          if (textContent && identifier) {
+            sections.push({
+              identifier,
+              label,
+              text: textContent
+            });
+          }
+        }
+
+        // Recursively search for more sections
+        if (Array.isArray(obj)) {
+          obj.forEach((item, index) => findSections(item, `${path}[${index}]`));
+        } else if (typeof obj === 'object') {
+          Object.entries(obj as Record<string, unknown>).forEach(([key, value]) => {
+            findSections(value, path ? `${path}.${key}` : key);
+          });
+        }
+      };
+
+      findSections(result);
+    });
+
+  } catch (error) {
+    console.error('Error parsing XML:', error);
+    // Fallback to regex parsing if xml2js fails
+    console.log('Falling back to regex parsing...');
+    return parseSectionsRegex(xml);
+  }
+
+  return sections;
+}
+
+// Keep the original regex parsing as a fallback
+function parseSectionsRegex(xml: string): SectionData[] {
   const sections: SectionData[] = [];
 
   try {
@@ -105,10 +220,81 @@ function parseSections(xml: string): SectionData[] {
       }
     }
   } catch (error) {
-    console.error('Error parsing XML:', error);
+    console.error('Error parsing XML with regex:', error);
   }
 
   return sections;
+}
+
+// Alternative: Use structure JSON data combined with targeted XML fetching
+async function fetchSectionsFromStructure(title: string, date: string): Promise<SectionData[]> {
+  const sections: SectionData[] = [];
+
+  try {
+    const structure = await fetchStructure(title, date);
+
+    // Navigate the structure to find sections
+    const extractSectionsFromStructure = (node: unknown, path: string[] = []): void => {
+      if (!node || typeof node !== 'object') return;
+
+      const nodeObj = node as Record<string, unknown>;
+
+      // Check if this node represents a section
+      if (nodeObj.type === 'section' && nodeObj.identifier) {
+        const identifier = String(nodeObj.identifier);
+        const label = String(nodeObj.label || nodeObj.title || '');
+
+        // For now, we'll still need the XML content to get the full text
+        // But this gives us a more reliable way to identify sections
+        sections.push({
+          identifier,
+          label,
+          text: '' // Will be filled in by XML parsing
+        });
+      }
+
+      // Recursively process children
+      if (Array.isArray(nodeObj.children)) {
+        nodeObj.children.forEach((child, index) => {
+          extractSectionsFromStructure(child, [...path, String(index)]);
+        });
+      }
+
+      // Also check other potential child properties
+      Object.entries(nodeObj).forEach(([key, value]) => {
+        if (key !== 'children' && Array.isArray(value)) {
+          value.forEach((child, index) => {
+            extractSectionsFromStructure(child, [...path, key, String(index)]);
+          });
+        }
+      });
+    };
+
+    extractSectionsFromStructure(structure);
+
+    // If we found sections in structure but no text, we still need to parse XML
+    if (sections.length > 0 && sections.every(s => !s.text)) {
+      console.log(`Found ${sections.length} sections in structure, fetching XML content...`);
+      const xml = await fetchContent(title, date);
+      const xmlSections = parseSections(xml);
+
+      // Match structure sections with XML content
+      sections.forEach(structSection => {
+        const xmlSection = xmlSections.find(xs => xs.identifier === structSection.identifier);
+        if (xmlSection) {
+          structSection.text = xmlSection.text;
+        }
+      });
+    }
+
+  } catch (error) {
+    console.error('Error fetching sections from structure:', error);
+    // Fallback to XML-only parsing
+    const xml = await fetchContent(title, date);
+    return parseSections(xml);
+  }
+
+  return sections.filter(s => s.text); // Only return sections with content
 }
 
 function calculateWordCount(text: string): number {
@@ -130,26 +316,122 @@ async function ingestData(maxAgencies?: number) {
     agency.cfr_references && agency.cfr_references.length > 0
   );
 
-  // Limit agencies if maxAgencies is specified
+  console.log(`Found ${agenciesWithCFR.length} agencies with CFR references out of ${allAgencies.length} total agencies`);
+
+  // If maxAgencies is specified, prioritize getting complete parent-child hierarchies
   if (maxAgencies && maxAgencies > 0) {
-    agenciesWithCFR = agenciesWithCFR.slice(0, maxAgencies);
-    console.log(`Limited to ${maxAgencies} agencies for testing`);
+    console.log(`\nSelecting agencies for testing with hierarchy preservation...`);
+
+    // Find parent agencies (those with children) that also have CFR references
+    const parentAgenciesWithCFR = agenciesWithCFR.filter(agency =>
+      agency.children && agency.children.length > 0
+    );
+
+    console.log(`Found ${parentAgenciesWithCFR.length} parent agencies with CFR references`);
+
+    // Sort by number of children to get the most interesting hierarchies
+    parentAgenciesWithCFR.sort((a, b) => (b.children?.length || 0) - (a.children?.length || 0));
+
+    // When maxAgencies is specified, select that many parent agencies and ALL their children
+    // This ensures we get complete hierarchies for testing
+    const numParentsToSelect = Math.min(maxAgencies, parentAgenciesWithCFR.length);
+    const selectedParents = parentAgenciesWithCFR.slice(0, numParentsToSelect);
+    console.log(`Selected ${numParentsToSelect} parent agencies (plus their children):`);
+    selectedParents.forEach(parent => {
+      console.log(`  ${parent.name}: ${parent.children?.length || 0} children`);
+    });
+
+    // Get all children of selected parents
+    const selectedAgencies = new Set<string>();
+    const childrenInfo = new Map<string, string[]>();
+
+    // Add parents
+    selectedParents.forEach(parent => {
+      selectedAgencies.add(parent.slug);
+      console.log(`\nProcessing parent: ${parent.name} (${parent.children?.length || 0} total children)`);
+
+      // Debug: Show the structure of children
+      if (parent.children && parent.children.length > 0) {
+        console.log(`  First child structure:`, JSON.stringify(parent.children[0], null, 2));
+      }
+
+      // Add all their children (check in the full agency list, not just those with CFR references)
+      const childrenSlugs: string[] = [];
+      parent.children?.forEach(child => {
+        console.log(`  Checking child: ${child.name} (slug: ${child.slug}) - CFR references: ${child.cfr_references?.length || 0}`);
+
+        // The child object already contains cfr_references, so we can check directly
+        if (child.cfr_references && child.cfr_references.length > 0) {
+          selectedAgencies.add(child.slug);
+          childrenSlugs.push(child.slug);
+          console.log(`    ✓ Added ${child.name} (has CFR references)`);
+        } else {
+          console.log(`    ✗ Skipped ${child.name} (no CFR references)`);
+        }
+      });
+
+      if (childrenSlugs.length > 0) {
+        childrenInfo.set(parent.slug, childrenSlugs);
+      }
+    });
+
+    // Filter to include selected agencies (both parents and their children)
+    // Build a complete list from selected parents and their children
+    const selectedAgencyObjects: RawAgency[] = [];
+
+    selectedParents.forEach(parent => {
+      // Add the parent
+      selectedAgencyObjects.push(parent);
+
+      // Add children that have CFR references
+      const childrenWithCFR = childrenInfo.get(parent.slug) || [];
+      childrenWithCFR.forEach(childSlug => {
+        const child = parent.children?.find(c => c.slug === childSlug);
+        if (child) {
+          selectedAgencyObjects.push(child);
+        }
+      });
+    });
+
+    agenciesWithCFR = selectedAgencyObjects;
+
+    console.log(`\nSelected ${agenciesWithCFR.length} agencies total (${selectedParents.length} parents + their children with CFR references)`);
+    console.log(`Hierarchy breakdown:`);
+    selectedParents.forEach(parent => {
+      const childrenWithCFR = childrenInfo.get(parent.slug) || [];
+      console.log(`  ${parent.name}: ${childrenWithCFR.length} children with CFR references`);
+      childrenWithCFR.forEach(childSlug => {
+        const child = agenciesWithCFR.find(a => a.slug === childSlug);
+        if (child) {
+          console.log(`    └─ ${child.name}`);
+        }
+      });
+    });
+  } else {
+    console.log('Running full ingestion for all agencies');
   }
 
   console.log(`Found ${agenciesWithCFR.length} agencies with CFR references out of ${allAgencies.length} total agencies`);
 
   // Create agencies in database and get their IDs
-  const createdAgencies = [];
+  const createdAgencies: Array<{ id: number; name: string; slug: string; description: string | null; parentId: number | null }> = [];
   const agencyTitleMap = new Map<string, number[]>(); // Map agency slug to their CFR title numbers
+  const agencyHierarchyMap = new Map<string, string[]>(); // Map parent slug to child slugs
 
+  // First pass: Create all agencies without parent relationships
   for (const rawAgency of agenciesWithCFR) {
     const createdAgency = await prisma.agency.upsert({
       where: { slug: rawAgency.slug },
-      update: { name: rawAgency.name, description: rawAgency.short_name },
+      update: {
+        name: rawAgency.name,
+        description: rawAgency.short_name,
+        // Don't update parentId here - we'll set it in second pass
+      },
       create: {
         name: rawAgency.name,
         description: rawAgency.short_name,
         slug: rawAgency.slug,
+        // parentId will be null initially
       },
     });
     createdAgencies.push(createdAgency);
@@ -157,7 +439,41 @@ async function ingestData(maxAgencies?: number) {
     // Get CFR title references for this agency
     const titleNumbers = rawAgency.cfr_references?.map((ref: { title: number; chapter: string }) => ref.title) || [];
     agencyTitleMap.set(rawAgency.slug, titleNumbers);
+
+    // Store children information for hierarchy setup from eCFR API data
+    if (rawAgency.children && rawAgency.children.length > 0) {
+      // Filter children to only include those that are also in our selected agencies
+      const childSlugsInSystem = rawAgency.children
+        .map(child => child.slug)
+        .filter(childSlug => agenciesWithCFR.some(a => a.slug === childSlug));
+
+      if (childSlugsInSystem.length > 0) {
+        agencyHierarchyMap.set(rawAgency.slug, childSlugsInSystem);
+        console.log(`${rawAgency.name} has ${childSlugsInSystem.length} children in system: ${rawAgency.children.filter(c => childSlugsInSystem.includes(c.slug)).map(c => c.name).join(', ')}`);
+      }
+    }
+
     console.log(`${rawAgency.name} references CFR titles: ${titleNumbers.join(', ')}`);
+  }
+
+  // Second pass: Establish parent-child relationships
+  console.log('\nEstablishing agency hierarchy relationships...');
+  for (const [parentSlug, childSlugs] of agencyHierarchyMap.entries()) {
+    const parentAgency = createdAgencies.find(a => a.slug === parentSlug);
+    if (!parentAgency) continue;
+
+    for (const childSlug of childSlugs) {
+      // Check if the child agency is also in our filtered list
+      const childAgency = createdAgencies.find(a => a.slug === childSlug);
+      if (childAgency) {
+        // Update the child to point to its parent
+        await prisma.agency.update({
+          where: { id: childAgency.id },
+          data: { parentId: parentAgency.id },
+        });
+        console.log(`Set ${childAgency.name} as child of ${parentAgency.name}`);
+      }
+    }
   }  console.log('Fetching titles...');
   const titlesData = await fetchTitles();
 
@@ -220,6 +536,32 @@ async function ingestData(maxAgencies?: number) {
   }
 
   console.log('Titles per agency:', titleCountByAgency);
+
+  // Report on agency hierarchy established
+  console.log('\n=== AGENCY HIERARCHY ESTABLISHED ===');
+  const hierarchyReport = [];
+  for (const agency of createdAgencies) {
+    if (agencyHierarchyMap.has(agency.slug)) {
+      const childSlugs = agencyHierarchyMap.get(agency.slug)!;
+      const childrenInSystem = childSlugs.filter(slug =>
+        createdAgencies.some(a => a.slug === slug)
+      );
+      if (childrenInSystem.length > 0) {
+        const childNames = childrenInSystem.map(slug =>
+          createdAgencies.find(a => a.slug === slug)?.name || slug
+        );
+        hierarchyReport.push(`${agency.name}: ${childNames.join(', ')}`);
+      }
+    }
+  }
+
+  if (hierarchyReport.length > 0) {
+    console.log('Department hierarchies established:');
+    hierarchyReport.forEach(report => console.log(`  ${report}`));
+  } else {
+    console.log('No hierarchical relationships found in the selected agencies.');
+  }
+  console.log('==========================================\n');
 
   // Analyze cross-cutting administrative rules and agency impact
   console.log('\n=== CROSS-CUTTING ADMINISTRATIVE RULES ANALYSIS ===');
@@ -310,8 +652,14 @@ async function ingestData(maxAgencies?: number) {
       const structure = await fetchStructure(titleNumber.toString(), latestDate);
       const content = await fetchContent(titleNumber.toString(), latestDate);
 
-      // Parse sections once for this CFR title
+      // Parse sections using improved XML parsing (with xml2js)
       const sections = parseSections(content);
+
+      console.log(`Parsed ${sections.length} sections for CFR Title ${titleNumber}`);
+      if (sections.length === 0) {
+        console.warn(`No sections found for CFR Title ${titleNumber}, trying alternative approach...`);
+        // Could try fetchSectionsFromStructure here as an alternative
+      }
 
       // Create versions for all agency title entries that reference this CFR title
       for (const { dbId } of dbEntries) {

@@ -85,6 +85,8 @@ export default function Analysis() {
   const [showChecksumTooltip, setShowChecksumTooltip] = useState(false);
   const [showComplexityTooltip, setShowComplexityTooltip] = useState(false);
   const [showCrossCuttingTooltip, setShowCrossCuttingTooltip] = useState(false);
+  const [includeSubAgencies, setIncludeSubAgencies] = useState(false);
+  const [aggregatedData, setAggregatedData] = useState<AnalysisData>({});
 
   // Calculate cross-cutting severity score based on multiple factors
   const calculateCrossCuttingSeverity = (
@@ -128,6 +130,23 @@ export default function Analysis() {
 
   const crossCuttingSeverity = calculateCrossCuttingSeverity(crossCuttingData.summary, crossCuttingData.crossCuttingTitles);
 
+  // Helper function to get selected agency details
+  const getSelectedAgencyDetails = () => {
+    return agencies.find(agency => agency.id === selectedAgency);
+  };
+
+  // Helper function to check if selected agency has children
+  const selectedAgencyHasChildren = () => {
+    const agency = getSelectedAgencyDetails();
+    return agency?.children && agency.children.length > 0;
+  };
+
+  // Helper function to get child agency IDs
+  const getChildAgencyIds = () => {
+    const agency = getSelectedAgencyDetails();
+    return agency?.children?.map(child => child.id) || [];
+  };
+
   useEffect(() => {
     fetch('/api/data/agencies')
       .then(res => res.json())
@@ -164,8 +183,8 @@ export default function Analysis() {
 
       // Handle field mapping for complexity score API
       if (endpoint === 'complexity_score' && data.complexity_score !== undefined) {
-        data.complexityScore = data.complexity_score;
-        data.relativeComplexityScore = data.relative_complexity_score;
+        data.complexityScore = Math.round(data.complexity_score);
+        data.relativeComplexityScore = Math.round(data.relative_complexity_score || 0);
       }
 
       setAnalysisData(prev => ({ ...prev, ...data }));
@@ -190,6 +209,83 @@ export default function Analysis() {
     } finally {
       setCrossCuttingLoading(false);
     }
+  };
+
+  // Function to fetch aggregated data for parent and all children
+  const fetchAggregatedAnalysis = async (endpoint: string, parentAgencyId: number) => {
+    const childIds = getChildAgencyIds();
+    const allAgencyIds = [parentAgencyId, ...childIds];
+
+    // Set loading state based on endpoint
+    if (endpoint === 'word_count') setWordCountLoading(true);
+    else if (endpoint === 'checksum') setChecksumLoading(true);
+    else if (endpoint === 'complexity_score') setComplexityScoreLoading(true);
+
+    try {
+      // Fetch data for all agencies (parent + children)
+      const promises = allAgencyIds.map(async (agencyId) => {
+        const url = `/api/analysis/${endpoint}/agency/${agencyId}`;
+        const res = await fetch(url);
+        return await res.json();
+      });
+
+      const results = await Promise.all(promises);
+
+      // Aggregate the results based on endpoint type
+      let aggregatedResult = {};
+
+      if (endpoint === 'word_count') {
+        const totalWordCount = results.reduce((sum, result) => sum + (result.wordCount || 0), 0);
+        aggregatedResult = { wordCount: totalWordCount };
+      } else if (endpoint === 'complexity_score') {
+        // Average complexity scores and round to whole numbers
+        const validScores = results.filter(result => result.complexity_score !== undefined);
+        if (validScores.length > 0) {
+          const avgComplexity = validScores.reduce((sum, result) => sum + result.complexity_score, 0) / validScores.length;
+          const avgRelativeComplexity = validScores.reduce((sum, result) => sum + (result.relative_complexity_score || 0), 0) / validScores.length;
+          aggregatedResult = {
+            complexityScore: Math.round(avgComplexity),
+            relativeComplexityScore: Math.round(avgRelativeComplexity)
+          };
+        }
+      } else if (endpoint === 'checksum') {
+        // For checksum, we can create a combined hash or just show the parent's checksum
+        const parentResult = results[0];
+        aggregatedResult = { checksum: parentResult.checksum };
+      }
+
+      setAggregatedData(prev => ({ ...prev, ...aggregatedResult }));
+    } catch (error) {
+      console.error('Error fetching aggregated analysis:', error);
+    } finally {
+      // Clear loading state
+      if (endpoint === 'word_count') setWordCountLoading(false);
+      else if (endpoint === 'checksum') setChecksumLoading(false);
+      else if (endpoint === 'complexity_score') setComplexityScoreLoading(false);
+    }
+  };
+
+  // Function to handle toggle change
+  const handleAggregationToggle = async (checked: boolean) => {
+    setIncludeSubAgencies(checked);
+
+    if (!selectedAgency) return;
+
+    if (checked && selectedAgencyHasChildren()) {
+      // Fetch aggregated data
+      setAggregatedData({});
+      await fetchAggregatedAnalysis('word_count', selectedAgency);
+      await fetchAggregatedAnalysis('checksum', selectedAgency);
+      await fetchAggregatedAnalysis('complexity_score', selectedAgency);
+    } else {
+      // Reset to individual agency data
+      setAggregatedData({});
+    }
+  };
+
+  // Helper function to get the data to display (individual or aggregated)
+  const getDisplayData = () => {
+    return includeSubAgencies && selectedAgencyHasChildren() ? aggregatedData : analysisData;
   };
 
   return (
@@ -227,6 +323,8 @@ export default function Analysis() {
                     onChange={(e) => {
                       const agencyId = parseInt(e.target.value);
                       setSelectedAgency(agencyId);
+                      setIncludeSubAgencies(false); // Reset aggregation toggle
+                      setAggregatedData({}); // Reset aggregated data
                       if (agencyId) {
                         // Reset analysis data
                         setAnalysisData({});
@@ -287,6 +385,42 @@ export default function Analysis() {
                     Select a federal agency to view its regulatory analysis data
                   </div>
                 </div>
+
+                {/* Aggregation Toggle - only show if selected agency has children */}
+                {selectedAgency && selectedAgencyHasChildren() && (
+                  <div className="mt-6 p-4 bg-muted/50 border border-border rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <label htmlFor="aggregation-toggle" className="text-sm font-semibold text-card-foreground">
+                          Include Sub-Agency Data
+                        </label>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Aggregate metrics from {getSelectedAgencyDetails()?.name} and all its sub-agencies
+                        </p>
+                      </div>
+                      <div className="flex items-center">
+                        <input
+                          id="aggregation-toggle"
+                          type="checkbox"
+                          checked={includeSubAgencies}
+                          onChange={(e) => handleAggregationToggle(e.target.checked)}
+                          className="h-4 w-4 text-primary focus:ring-ring border-border rounded transition-colors duration-200"
+                        />
+                      </div>
+                    </div>
+                    {includeSubAgencies && (
+                      <div className="mt-3 text-xs text-muted-foreground">
+                        <strong>Including data from:</strong>
+                        <ul className="mt-1 ml-4">
+                          <li>• {getSelectedAgencyDetails()?.name} (Main Department)</li>
+                          {getSelectedAgencyDetails()?.children?.map(child => (
+                            <li key={child.id}>• {child.name}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
               </form>
             </div>
           </section>        <section aria-labelledby="metrics-heading" aria-live="polite" className="mb-12">
@@ -340,12 +474,17 @@ export default function Analysis() {
                     <p className="text-4xl font-bold text-muted-foreground">Loading...</p>
                   </div>
                 ) : (
-                  <p className="text-4xl font-bold text-chart-1 mb-2" aria-label={`Total word count: ${analysisData.wordCount?.toLocaleString() || 'Not available'}`}>
-                    {analysisData.wordCount?.toLocaleString() || 'N/A'}
+                  <p className="text-4xl font-bold text-chart-1 mb-2" aria-label={`Total word count: ${getDisplayData().wordCount?.toLocaleString() || 'Not available'}`}>
+                    {getDisplayData().wordCount?.toLocaleString() || 'N/A'}
                   </p>
                 )}
               </div>
-              <p className="text-sm text-muted-foreground">Total regulatory text volume</p>
+              <p className="text-sm text-muted-foreground">
+                {includeSubAgencies && selectedAgencyHasChildren() ?
+                  'Total regulatory text volume (including sub-agencies)' :
+                  'Total regulatory text volume'
+                }
+              </p>
             </article>
 
             <article className="bg-card border border-border rounded-lg p-8 shadow-sm hover:shadow-md transition-shadow duration-200">
@@ -394,11 +533,16 @@ export default function Analysis() {
                     <span className="text-sm text-muted-foreground">Calculating checksum...</span>
                   </div>
                 ) : (
-                  <p className="text-sm font-mono break-all text-muted-foreground bg-muted p-3 rounded border" aria-label={`Document checksum: ${analysisData.checksum || 'Not available'}`}>
-                    {analysisData.checksum || 'N/A'}
+                  <p className="text-sm font-mono break-all text-muted-foreground bg-muted p-3 rounded border" aria-label={`Document checksum: ${getDisplayData().checksum || 'Not available'}`}>
+                    {getDisplayData().checksum || 'N/A'}
                   </p>
                 )}
-                <p className="text-sm text-muted-foreground">Verification hash</p>
+                <p className="text-sm text-muted-foreground">
+                  {includeSubAgencies && selectedAgencyHasChildren() ?
+                    'Verification hash (parent agency)' :
+                    'Verification hash'
+                  }
+                </p>
               </div>
             </article>
 
@@ -463,40 +607,43 @@ export default function Analysis() {
                   </div>
                 ) : (
                   <p className={`text-4xl font-bold mb-2 ${
-                    !analysisData.relativeComplexityScore ? 'text-muted-foreground' :
-                    analysisData.relativeComplexityScore < 25 ? 'text-green-600 dark:text-green-400' :
-                    analysisData.relativeComplexityScore <= 60 ? 'text-orange-600 dark:text-orange-400' :
+                    !getDisplayData().relativeComplexityScore ? 'text-muted-foreground' :
+                    (getDisplayData().relativeComplexityScore || 0) < 25 ? 'text-green-600 dark:text-green-400' :
+                    (getDisplayData().relativeComplexityScore || 0) <= 60 ? 'text-orange-600 dark:text-orange-400' :
                     'text-red-600 dark:text-red-400'
-                  }`} aria-label={`Complexity score: ${analysisData.relativeComplexityScore || 'Not available'} out of 100`}>
-                    {analysisData.relativeComplexityScore ? `${analysisData.relativeComplexityScore}/100` : 'N/A'}
+                  }`} aria-label={`Complexity score: ${getDisplayData().relativeComplexityScore || 'Not available'} out of 100`}>
+                    {getDisplayData().relativeComplexityScore ? `${getDisplayData().relativeComplexityScore}/100` : 'N/A'}
                   </p>
                 )}
                 <p className="text-sm text-muted-foreground mb-2">
-                  Relative to most complex agency
-                  {analysisData.complexityScore && (
+                  {includeSubAgencies && selectedAgencyHasChildren() ?
+                    'Average complexity across department' :
+                    'Relative to most complex agency'
+                  }
+                  {getDisplayData().complexityScore && (
                     <span className="block text-xs opacity-75">
-                      (Raw score: {analysisData.complexityScore.toLocaleString()})
+                      (Raw score: {getDisplayData().complexityScore?.toLocaleString()})
                     </span>
                   )}
                 </p>
               </div>
-              {analysisData.metrics && !complexityScoreLoading && (
+              {getDisplayData().metrics && !complexityScoreLoading && (
                 <dl className="mt-4 space-y-2 text-sm text-muted-foreground">
                   <div className="flex justify-between py-1 border-b border-border/30">
                     <dt className="font-medium">Sections:</dt>
-                    <dd className="text-card-foreground">{analysisData.metrics.totalSections}</dd>
+                    <dd className="text-card-foreground">{getDisplayData().metrics?.totalSections}</dd>
                   </div>
                   <div className="flex justify-between py-1 border-b border-border/30">
                     <dt className="font-medium">Total Words:</dt>
-                    <dd className="text-card-foreground">{analysisData.metrics.totalWords}</dd>
+                    <dd className="text-card-foreground">{getDisplayData().metrics?.totalWords}</dd>
                   </div>
                   <div className="flex justify-between py-1 border-b border-border/30">
                     <dt className="font-medium">Avg Words/Section:</dt>
-                    <dd className="text-card-foreground">{analysisData.metrics.avgWordsPerSection?.toFixed(1)}</dd>
+                    <dd className="text-card-foreground">{getDisplayData().metrics?.avgWordsPerSection?.toFixed(1)}</dd>
                   </div>
                   <div className="flex justify-between py-1">
                     <dt className="font-medium">Hierarchy Depth:</dt>
-                    <dd className="text-card-foreground">{analysisData.metrics.hierarchyDepth || 'N/A'}</dd>
+                    <dd className="text-card-foreground">{getDisplayData().metrics?.hierarchyDepth || 'N/A'}</dd>
                   </div>
                 </dl>
               )}

@@ -13,13 +13,8 @@ echo "Generating Prisma client..."
 npx prisma generate
 
 echo "Starting data ingestion..."
-if [ "$NODE_ENV" = "production" ]; then
-  echo "Production environment detected - ingesting all agencies"
-  npm run ingest:all
-else
-  echo "Development environment - ingesting 30 agencies for testing"
-  npm run ingest -- --max-agencies=30
-fi
+npm run ingest -- --max-agencies=10
+# npm run ingest:all
 
 echo "Starting Next.js development server..."
 npm run dev
