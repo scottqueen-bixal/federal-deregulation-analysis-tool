@@ -1,11 +1,23 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import type { JSX } from 'react';
 
 interface Agency {
   id: number;
   name: string;
   slug: string;
+  parentId?: number | null;
+  parent?: {
+    id: number;
+    name: string;
+    slug: string;
+  } | null;
+  children?: {
+    id: number;
+    name: string;
+    slug: string;
+  }[];
 }
 
 interface AnalysisData {
@@ -232,11 +244,44 @@ export default function Analysis() {
                     <option value="" className="text-muted-foreground">
                       {agenciesLoading ? 'Loading agencies...' : 'Choose an agency...'}
                     </option>
-                    {Array.isArray(agencies) && agencies.map(agency => (
-                      <option key={agency.id} value={agency.id} className="text-foreground">
-                        {agency.name}
-                      </option>
-                    ))}
+                    {Array.isArray(agencies) && (() => {
+                      // Group agencies by parent
+                      const parentAgencies = agencies.filter(agency => !agency.parentId);
+                      const childAgencies = agencies.filter(agency => agency.parentId);
+
+                      const renderOptions: JSX.Element[] = [];
+
+                      // First render independent agencies (no parent)
+                      parentAgencies.forEach(agency => {
+                        // Check if this agency has children
+                        const children = childAgencies.filter(child => child.parentId === agency.id);
+
+                        if (children.length > 0) {
+                          // This is a parent agency with children
+                          renderOptions.push(
+                            <optgroup key={`parent-${agency.id}`} label={agency.name}>
+                              <option key={agency.id} value={agency.id} className="text-foreground font-medium">
+                                {agency.name} (Main Department)
+                              </option>
+                              {children.map(child => (
+                                <option key={child.id} value={child.id} className="text-foreground ml-4">
+                                  └─ {child.name}
+                                </option>
+                              ))}
+                            </optgroup>
+                          );
+                        } else {
+                          // This is an independent agency
+                          renderOptions.push(
+                            <option key={agency.id} value={agency.id} className="text-foreground">
+                              {agency.name}
+                            </option>
+                          );
+                        }
+                      });
+
+                      return renderOptions;
+                    })()}
                   </select>
                   <div id="agency-select-description" className="sr-only">
                     Select a federal agency to view its regulatory analysis data

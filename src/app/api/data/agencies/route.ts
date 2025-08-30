@@ -9,7 +9,26 @@ export async function GET() {
         name: true,
         slug: true,
         description: true,
+        parentId: true,
+        parent: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+        children: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
       },
+      orderBy: [
+        { parentId: { sort: 'asc', nulls: 'first' } },
+        { name: 'asc' }
+      ],
     });
     return NextResponse.json({ agencies });
   } catch (error) {
