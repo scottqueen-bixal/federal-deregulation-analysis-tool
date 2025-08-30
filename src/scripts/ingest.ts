@@ -409,6 +409,79 @@ async function ingestData(maxAgencies?: number) {
     });
   } else {
     console.log('Running full ingestion for all agencies');
+    console.log('🔍 DEBUGGING: Starting full ingestion hierarchy processing...');
+
+    // For full ingestion, we need to include both:
+    // 1. Agencies with direct CFR references
+    // 2. Child agencies whose parents have CFR references (even if the children don't)
+
+    // First, build the hierarchy map from ALL agencies (before filtering)
+    const hierarchyMap = new Map<string, string[]>();
+
+    for (const agency of allAgencies) {
+      if (agency.children && agency.children.length > 0) {
+        const childSlugs = agency.children.map(child => child.slug);
+        hierarchyMap.set(agency.slug, childSlugs);
+        console.log(`Found hierarchy: ${agency.name} has ${childSlugs.length} children: ${agency.children.map(c => c.name).join(', ')}`);
+      }
+    }
+
+    console.log(`🔍 DEBUGGING: Built hierarchy map with ${hierarchyMap.size} parent agencies`);
+
+    // Find agencies with direct CFR references
+    const agenciesWithDirectCFR = allAgencies.filter(agency =>
+      agency.cfr_references && agency.cfr_references.length > 0
+    );
+
+    console.log(`🔍 DEBUGGING: Found ${agenciesWithDirectCFR.length} agencies with direct CFR references`);
+
+    // Start with agencies that have direct CFR references
+    const agenciesToInclude = [...agenciesWithDirectCFR];
+    console.log(`🔍 DEBUGGING: Starting with ${agenciesToInclude.length} agencies with direct CFR references`);
+
+    // For each parent agency with CFR references, include its children even if they don't have CFR references
+    for (const parentAgency of agenciesWithDirectCFR) {
+      if (hierarchyMap.has(parentAgency.slug)) {
+        const childSlugs = hierarchyMap.get(parentAgency.slug)!;
+        console.log(`🔍 DEBUGGING: Looking for children of ${parentAgency.name} with slugs: ${childSlugs.join(', ')}`);
+
+        // Instead of looking for children in allAgencies (where they don't exist as separate entities),
+        // get them directly from the parent's children array
+        const childAgencies = parentAgency.children || [];
+
+        console.log(`🔍 DEBUGGING: Found ${childAgencies.length} children for ${parentAgency.name}: ${childAgencies.map(c => c.name).join(', ')}`);
+
+        // For each child, check if it has CFR references
+        const childrenWithCFR = childAgencies.filter(child =>
+          child.cfr_references && child.cfr_references.length > 0
+        );
+
+        console.log(`🔍 DEBUGGING: ${childrenWithCFR.length} of ${childAgencies.length} children have CFR references for ${parentAgency.name}: ${childrenWithCFR.map(c => c.name).join(', ')}`);
+
+        for (const child of childrenWithCFR) {
+          if (!agenciesToInclude.find(a => a.slug === child.slug)) {
+            console.log(`🔍 DEBUGGING: Adding child agency ${child.name} (parent: ${parentAgency.name})`);
+            agenciesToInclude.push(child);
+          }
+        }
+      }
+    }
+
+    console.log(`🔍 DEBUGGING: Total agencies to include (parents + children): ${agenciesToInclude.length}`);
+
+    // Now restore the children relationships for agencies in our final list
+    for (const agency of agenciesToInclude) {
+      if (hierarchyMap.has(agency.slug)) {
+        const childSlugs = hierarchyMap.get(agency.slug)!;
+        // Find children that are in our final list
+        agency.children = agenciesToInclude.filter(a => childSlugs.includes(a.slug));
+        if (agency.children.length > 0) {
+          console.log(`Restored hierarchy: ${agency.name} has ${agency.children.length} children in final set`);
+        }
+      }
+    }
+
+    agenciesWithCFR = agenciesToInclude;
   }
 
   console.log(`Found ${agenciesWithCFR.length} agencies with CFR references out of ${allAgencies.length} total agencies`);
@@ -441,6 +514,7 @@ async function ingestData(maxAgencies?: number) {
     agencyTitleMap.set(rawAgency.slug, titleNumbers);
 
     // Store children information for hierarchy setup from eCFR API data
+    // This works for both limited and full ingestion
     if (rawAgency.children && rawAgency.children.length > 0) {
       // Filter children to only include those that are also in our selected agencies
       const childSlugsInSystem = rawAgency.children
@@ -458,9 +532,15 @@ async function ingestData(maxAgencies?: number) {
 
   // Second pass: Establish parent-child relationships
   console.log('\nEstablishing agency hierarchy relationships...');
+  console.log(`AgencyHierarchyMap has ${agencyHierarchyMap.size} entries`);
+
   for (const [parentSlug, childSlugs] of agencyHierarchyMap.entries()) {
+    console.log(`Processing parent ${parentSlug} with ${childSlugs.length} children: ${childSlugs.join(', ')}`);
     const parentAgency = createdAgencies.find(a => a.slug === parentSlug);
-    if (!parentAgency) continue;
+    if (!parentAgency) {
+      console.log(`  Parent agency ${parentSlug} not found in created agencies`);
+      continue;
+    }
 
     for (const childSlug of childSlugs) {
       // Check if the child agency is also in our filtered list
@@ -472,6 +552,8 @@ async function ingestData(maxAgencies?: number) {
           data: { parentId: parentAgency.id },
         });
         console.log(`Set ${childAgency.name} as child of ${parentAgency.name}`);
+      } else {
+        console.log(`  Child agency ${childSlug} not found in created agencies`);
       }
     }
   }  console.log('Fetching titles...');
