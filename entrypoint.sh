@@ -13,8 +13,8 @@ echo "Generating Prisma client..."
 npx prisma generate
 
 echo "Starting data ingestion..."
-npm run ingest -- --max-agencies=10
-# npm run ingest:all
+# npm run ingest -- --max-agencies=10
+npm run ingest:all
 
 echo "Starting Next.js development server..."
 npm run dev
