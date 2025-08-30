@@ -1,18 +1,70 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../../../../lib/prisma';
 
+// Simple in-memory cache with TTL
+interface CacheEntry {
+  data: ComplexityScoreResponse;
+  expires: number;
+}
+
+interface ComplexityScoreResponse {
+  agencyId: number;
+  complexity_score: number;
+  relative_complexity_score: number;
+  hierarchy_depth: number;
+  cross_references: number;
+  technical_terms: number;
+  calculation_details: {
+    total_sections: number;
+    hierarchy_depth: number;
+    cross_references: number;
+    technical_terms: number;
+    volume_weight?: number;
+    structure_weight?: number;
+    cross_reference_weight?: number;
+    technical_weight?: number;
+    relative_score_out_of_100: number;
+  };
+}
+
+const cache = new Map<string, CacheEntry>();
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
+function getCached(key: string): ComplexityScoreResponse | null {
+  const cached = cache.get(key);
+  if (cached && cached.expires > Date.now()) {
+    return cached.data;
+  }
+  cache.delete(key);
+  return null;
+}
+
+function setCache(key: string, data: ComplexityScoreResponse): void {
+  cache.set(key, { data, expires: Date.now() + CACHE_TTL });
+}
+
 export async function GET(
   request: Request,
   context: { params: Promise<{ agencyId: string }> }
 ) {
   const { agencyId } = await context.params;
 
+  // Check cache first
+  const cacheKey = `complexity_score_${agencyId}`;
+  const cached = getCached(cacheKey);
+  if (cached) {
+    console.log(`[Complexity Score] Returning cached result for agency ${agencyId}`);
+    return NextResponse.json(cached);
+  }
+
   console.log(`[Complexity Score] Starting calculation for agency ${agencyId}`);
   const startTime = Date.now();
 
   try {
-    // Query section count and basic info for the given agency (much faster)
-    console.log(`[Complexity Score] Querying section count for agency ${agencyId}`);
+    // Use a single aggregation query to get both count and sample data efficiently
+    console.log(`[Complexity Score] Querying section data for agency ${agencyId}`);
+
+    // First get the count to determine sample strategy
     const sectionCount = await prisma.section.count({
       where: {
         version: {
@@ -26,8 +78,7 @@ export async function GET(
     console.log(`[Complexity Score] Found ${sectionCount} sections total`);
 
     if (sectionCount === 0) {
-      console.log(`[Complexity Score] No sections found for agency ${agencyId}`);
-      return NextResponse.json({
+      const result: ComplexityScoreResponse = {
         agencyId: parseInt(agencyId),
         complexity_score: 0,
         relative_complexity_score: 0,
@@ -41,14 +92,16 @@ export async function GET(
           technical_terms: 0,
           relative_score_out_of_100: 0
         }
-      });
+      };
+      setCache(cacheKey, result);
+      return NextResponse.json(result);
     }
 
-    // For large datasets, use sampling instead of processing everything
-    const sampleSize = Math.min(sectionCount, 100); // Process max 100 sections to avoid memory issues
-    console.log(`[Complexity Score] Using sample size of ${sampleSize} sections`);
+    // Get sample with random offset for better representation
+    const sampleSize = Math.min(sectionCount, 50); // Reduced sample size
+    const randomSkip = sectionCount > sampleSize ? Math.floor(Math.random() * (sectionCount - sampleSize)) : 0;
 
-    const sections = await prisma.section.findMany({
+    const sampleSections = await prisma.section.findMany({
       where: {
         version: {
           title: {
@@ -57,51 +110,55 @@ export async function GET(
         }
       },
       select: {
-        identifier: true,
-        textContent: true
+        textContent: true,
+        wordCount: true
       },
-      take: sampleSize
+      take: sampleSize,
+      skip: randomSkip
     });
 
-    console.log(`[Complexity Score] Retrieved ${sections.length} sections for analysis`);
+    console.log(`[Complexity Score] Analyzing ${sampleSections.length} sample sections`);
 
     // Use a fixed hierarchy depth to avoid expensive calculations
     const hierarchyDepth = 3; // Reasonable default for regulatory documents
     console.log(`[Complexity Score] Using fixed hierarchy depth: ${hierarchyDepth}`);
 
-    // Estimate cross-references and technical terms based on sample
-    console.log(`[Complexity Score] Estimating cross-references and technical terms from sample`);
+    // Optimized text analysis with pre-compiled regex patterns
+    console.log(`[Complexity Score] Analyzing text patterns in sample`);
+
+    // Pre-compile regex patterns for better performance
+    const cfrPattern = /(\d+\s*CFR\s*\d+\.\d+|§\s*\d+\.\d+)/gi;
+    const technicalPattern = /\b(shall|must|required|prohibited|compliance|pursuant|thereunder|thereof|hereby|wherein)\b/gi;
 
     let crossReferencesInSample = 0;
     let technicalTermsInSample = 0;
 
-    // Process in smaller batches to avoid memory issues
-    const batchSize = 100;
-    for (let i = 0; i < sections.length; i += batchSize) {
-      const batch = sections.slice(i, i + batchSize);
+    // Process all sections in a single pass without batching
+    sampleSections.forEach(section => {
+      const content = section.textContent || '';
 
-      batch.forEach(section => {
-        const content = section.textContent || '';
+      // Reset regex lastIndex to ensure fresh matching
+      cfrPattern.lastIndex = 0;
+      technicalPattern.lastIndex = 0;
 
-        // Count CFR references
-        const cfrMatches = content.match(/(\d+\s*CFR\s*\d+\.\d+|§\s*\d+\.\d+)/gi) || [];
-        crossReferencesInSample += cfrMatches.length;
+      // Count CFR references
+      const cfrMatches = content.match(cfrPattern) || [];
+      crossReferencesInSample += cfrMatches.length;
 
-        // Count technical terms (simplified patterns)
-        const technicalCount = (content.match(/\b(shall|must|required|prohibited|compliance)\b/gi) || []).length;
-        technicalTermsInSample += technicalCount;
-      });
-    }
+      // Count technical terms
+      const technicalMatches = content.match(technicalPattern) || [];
+      technicalTermsInSample += technicalMatches.length;
+    });
 
-    // Scale up estimates based on sample vs total
-    const scaleFactor = sectionCount / sections.length;
+    // Scale up estimates based on sample vs total with improved estimation
+    const scaleFactor = sectionCount / sampleSections.length;
     const crossReferences = Math.round(crossReferencesInSample * scaleFactor);
     const technicalTerms = Math.round(technicalTermsInSample * scaleFactor);
 
     console.log(`[Complexity Score] Cross-references estimated: ${crossReferences}`);
     console.log(`[Complexity Score] Technical terms estimated: ${technicalTerms}`);
 
-    // Calculate complexity score using simplified factors (no hierarchy depth)
+    // Calculate complexity score using simplified factors
     const complexity = (
       (sectionCount * 0.5) +              // Volume weight based on total sections
       (crossReferences * 2) +             // Cross-reference weight
@@ -111,11 +168,13 @@ export async function GET(
     const complexityScore = Math.round(complexity);
     console.log(`[Complexity Score] Final complexity score: ${complexityScore}`);
 
-    // Get max complexity score for relative calculation
-    console.log(`[Complexity Score] Fetching max complexity score for relative calculation`);
+    // Use a cached or estimated max complexity score to avoid expensive API call
+    console.log(`[Complexity Score] Calculating relative score`);
     let relativeScore = 0;
+
+    // Try to get max score from the cached endpoint
     try {
-      const maxResponse = await fetch(`http://localhost:3000/api/analysis/complexity_score/max`);
+      const maxResponse = await fetch(`http://localhost:3000/api/analysis/complexity_score/max-cached`);
       if (maxResponse.ok) {
         const maxData = await maxResponse.json();
         const maxScore = maxData.max_complexity_score;
@@ -125,12 +184,15 @@ export async function GET(
         }
       }
     } catch (error) {
-      console.warn(`[Complexity Score] Could not fetch max score for relative calculation:`, error);
+      console.warn(`[Complexity Score] Could not fetch max score, using estimate:`, error);
+      // Fallback to estimate
+      const estimatedMaxScore = 100000;
+      relativeScore = Math.round((complexityScore / estimatedMaxScore) * 100);
     }
 
     console.log(`[Complexity Score] Total time: ${Date.now() - startTime}ms`);
 
-    return NextResponse.json({
+    const result: ComplexityScoreResponse = {
       agencyId: parseInt(agencyId),
       complexity_score: complexityScore,
       relative_complexity_score: relativeScore,
@@ -138,17 +200,22 @@ export async function GET(
       cross_references: crossReferences,
       technical_terms: technicalTerms,
       calculation_details: {
-        total_sections: sectionCount,        // Use actual total count
+        total_sections: sectionCount,
         hierarchy_depth: hierarchyDepth,
         cross_references: crossReferences,
         technical_terms: technicalTerms,
-        volume_weight: sectionCount * 0.5,  // Use actual total count
+        volume_weight: sectionCount * 0.5,
         structure_weight: 0, // No longer using hierarchy depth
         cross_reference_weight: crossReferences * 2,
         technical_weight: technicalTerms * 0.1,
         relative_score_out_of_100: relativeScore
       }
-    });
+    };
+
+    // Cache the result before returning
+    setCache(cacheKey, result);
+
+    return NextResponse.json(result);
 
   } catch (error) {
     console.error('Error calculating complexity score:', error);
