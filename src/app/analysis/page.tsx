@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import type { JSX } from 'react';
+import { useState, useEffect } from 'react';
+import AgencyCombobox from '../../components/AgencyCombobox';
 
 interface Agency {
   id: number;
@@ -314,14 +314,10 @@ export default function Analysis() {
             <div className="bg-card border border-border rounded-lg p-8 shadow-sm">
               <form className="space-y-6">
                 <div>
-                  <label htmlFor="agency-select" className="block text-sm font-semibold mb-3 text-card-foreground">
-                    Select Federal Agency
-                  </label>
-                  <select
-                    id="agency-select"
-                    value={selectedAgency || ''}
-                    onChange={(e) => {
-                      const agencyId = parseInt(e.target.value);
+                  <AgencyCombobox
+                    agencies={agencies}
+                    selectedAgency={selectedAgency}
+                    onAgencyChange={(agencyId) => {
                       setSelectedAgency(agencyId);
                       setIncludeSubAgencies(false); // Reset aggregation toggle
                       setAggregatedData({}); // Reset aggregated data
@@ -335,63 +331,10 @@ export default function Analysis() {
                         fetchAnalysis('complexity_score', agencyId);
                       }
                     }}
-                    className="w-full p-4 bg-input border border-border rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all duration-200 font-medium"
+                    loading={agenciesLoading}
                     disabled={agenciesLoading}
-                    aria-describedby="agency-select-description"
-                  >
-                    <option value="" className="text-muted-foreground">
-                      {agenciesLoading ? 'Loading agencies...' : 'Choose an agency...'}
-                    </option>
-                    {Array.isArray(agencies) && (() => {
-                      // Group agencies by parent
-                      const parentAgencies = agencies.filter(agency => !agency.parentId);
-                      const childAgencies = agencies.filter(agency => agency.parentId);
-
-                      const renderOptions: JSX.Element[] = [];
-                      const independentAgencies: JSX.Element[] = [];
-
-                      // Process parent agencies
-                      parentAgencies.forEach(agency => {
-                        // Check if this agency has children
-                        const children = childAgencies.filter(child => child.parentId === agency.id);
-
-                        if (children.length > 0) {
-                          // This is a parent agency with children - create an optgroup
-                          renderOptions.push(
-                            <optgroup key={`parent-${agency.id}`} label={agency.name}>
-                              <option key={agency.id} value={agency.id} className="text-foreground font-medium">
-                                {agency.name} (Main Department)
-                              </option>
-                              {children.map(child => (
-                                <option key={child.id} value={child.id} className="text-foreground ml-4">
-                                  └─ {child.name}
-                                </option>
-                              ))}
-                            </optgroup>
-                          );
-                        } else {
-                          // This is an independent agency - add to independent list
-                          independentAgencies.push(
-                            <option key={agency.id} value={agency.id} className="text-foreground">
-                              {agency.name}
-                            </option>
-                          );
-                        }
-                      });
-
-                      // Add independent agencies as a group if there are any
-                      if (independentAgencies.length > 0) {
-                        renderOptions.push(
-                          <optgroup key="independent-agencies" label="Independent Agencies">
-                            {independentAgencies}
-                          </optgroup>
-                        );
-                      }
-
-                      return renderOptions;
-                    })()}
-                  </select>
-                  <div id="agency-select-description" className="sr-only">
+                  />
+                  <div className="sr-only">
                     Select a federal agency to view its regulatory analysis data
                   </div>
                 </div>
