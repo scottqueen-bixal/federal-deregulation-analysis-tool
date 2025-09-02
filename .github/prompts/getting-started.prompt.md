@@ -97,12 +97,11 @@ If any prerequisites are missing, provide installation instructions for their op
 
 ### Step 1: Repository Setup
 ```bash
-# Clone the repository (if not already done)
-git clone <repository-url>
-cd federal-deregulation-analysis-tool
-
 # Install all dependencies
 npm install
+
+# copy .env.example to .env
+cp .env.example .env
 ```
 
 **Verify installation**: Check that `node_modules` contains all required packages including Next.js, Prisma, and testing dependencies.
