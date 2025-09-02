@@ -302,6 +302,26 @@ export default function Analysis() {
     });
   };
 
+  // Function to handle agency selection from shared agencies list
+  const handleSharedAgencySelect = (agencyId: number) => {
+    setSelectedAgency(agencyId);
+    setIncludeSubAgencies(false); // Reset aggregation toggle
+    setAggregatedData({}); // Reset aggregated data
+    setExpandedSharedSections(new Set()); // Close all accordions
+
+    // Reset analysis data
+    setAnalysisData({});
+
+    // Fetch all data for the new agency
+    fetchCrossCuttingData(agencyId);
+    fetchAnalysis('word_count', agencyId);
+    fetchAnalysis('checksum', agencyId);
+    fetchAnalysis('complexity_score', agencyId);
+
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Skip Navigation */}
@@ -349,6 +369,7 @@ export default function Analysis() {
                       setSelectedAgency(agencyId);
                       setIncludeSubAgencies(false); // Reset aggregation toggle
                       setAggregatedData({}); // Reset aggregated data
+                      setExpandedSharedSections(new Set()); // Close all accordions
                       if (agencyId) {
                         // Reset analysis data
                         setAnalysisData({});
@@ -834,11 +855,14 @@ export default function Analysis() {
                               aria-label={`${title.sharedWith.length} agencies sharing this CFR title`}
                             >
                               {title.sharedWith.map((agency) => (
-                                <li
-                                  key={agency.id}
-                                  className="text-white hover:text-gray-200 transition-colors duration-200 px-3 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm"
-                                >
-                                  <span className="font-medium">{agency.name}</span>
+                                <li key={agency.id}>
+                                  <button
+                                    onClick={() => handleSharedAgencySelect(agency.id)}
+                                    className="w-full text-left text-white hover:text-gray-200 hover:bg-gray-600 transition-colors duration-200 px-3 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-gray-800"
+                                    aria-label={`Switch to ${agency.name} for analysis`}
+                                  >
+                                    <span className="font-medium">{agency.name}</span>
+                                  </button>
                                 </li>
                               ))}
                             </ul>
