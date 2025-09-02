@@ -992,7 +992,7 @@ export default function Analysis() {
                                 toggleSharedSection(index);
                               }
                             }}
-                            className="flex items-center justify-between w-full text-left text-sm font-semibold text-card-foreground hover:text-primary transition-colors duration-200 focus:outline-none focus:ring-[3px] focus:ring-ring focus:ring-offset-2 rounded-md px-2 py-1 cursor-pointer"
+                            className="flex items-center gap-2 text-left text-sm font-semibold text-card-foreground hover:text-primary transition-colors duration-200 focus:outline-none focus:ring-[3px] focus:ring-ring focus:ring-offset-2 rounded-md px-2 py-1 cursor-pointer"
                             aria-expanded={expandedSharedSections.has(index)}
                             aria-controls={`shared-agencies-${index}`}
                             id={`shared-toggle-${index}`}
