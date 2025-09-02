@@ -121,9 +121,9 @@ export default function Analysis() {
     // Determine severity level based on new ranges
     let level: 'MINIMAL' | 'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL';
     if (finalScore < 2) level = 'MINIMAL';
-    else if (finalScore < 6) level = 'LOW';
-    else if (finalScore < 11) level = 'MODERATE';
-    else if (finalScore < 21) level = 'HIGH';
+    else if (finalScore < 4) level = 'LOW';
+    else if (finalScore < 6) level = 'MODERATE';
+    else if (finalScore < 11) level = 'HIGH';
     else level = 'CRITICAL';
 
     return { score: Math.round(finalScore), level };
@@ -899,10 +899,10 @@ export default function Analysis() {
                           </p>
                           <ul className="list-disc list-inside mb-3 space-y-1 text-gray-700 ml-4">
                             <li className="text-gray-600"><strong>MINIMAL (0-1):</strong> Limited cross-agency impact</li>
-                            <li className="text-green-600"><strong>LOW (2-5):</strong> Minor overlap concerns</li>
-                            <li className="text-yellow-600"><strong>MODERATE (6-10):</strong> Significant coordination needed</li>
-                            <li className="text-orange-600"><strong>HIGH (11-20):</strong> Complex inter-agency effects</li>
-                            <li className="text-red-600"><strong>CRITICAL (21+):</strong> Major bureaucratic entanglement</li>
+                            <li className="text-green-600"><strong>LOW (2-3):</strong> Minor overlap concerns</li>
+                            <li className="text-yellow-600"><strong>MODERATE (4-5):</strong> Significant coordination needed</li>
+                            <li className="text-orange-600"><strong>HIGH (6-10):</strong> Complex inter-agency effects</li>
+                            <li className="text-red-600"><strong>CRITICAL (11+):</strong> Major bureaucratic entanglement</li>
                           </ul>
                           <p className="text-gray-700">
                             <strong className="text-gray-900">Why it matters:</strong> Higher scores indicate regulations requiring coordinated reform efforts and potential sources of bureaucratic inefficiency.
@@ -916,12 +916,12 @@ export default function Analysis() {
                   </div>
                 </div>
                 <p className={`text-4xl font-bold mb-2 ${
-                  crossCuttingSeverity.level === 'MINIMAL' ? 'text-gray-500 dark:text-gray-400' :
-                  crossCuttingSeverity.level === 'LOW' ? 'text-green-600 dark:text-green-400' :
+                  crossCuttingSeverity.level === 'MINIMAL' ? 'text-gray-600' :
+                  crossCuttingSeverity.level === 'LOW' ? 'text-green-600' :
                   crossCuttingSeverity.level === 'MODERATE' ? 'text-yellow-600' :
-                  crossCuttingSeverity.level === 'HIGH' ? 'text-orange-600 dark:text-orange-400' :
-                  'text-red-600 dark:text-red-400'
-                }`} aria-label={`Cross-cutting severity score: ${crossCuttingSeverity.score} out of 100, ${crossCuttingSeverity.level.toLowerCase()} impact`}>
+                  crossCuttingSeverity.level === 'HIGH' ? 'text-orange-600' :
+                  'text-red-600'
+                }`} aria-label={`Cross-cutting severity score: ${crossCuttingSeverity.score}, ${crossCuttingSeverity.level.toLowerCase()} severity level`}>
                   {crossCuttingSeverity.score}
                 </p>
                 <p className="text-sm text-muted-foreground mb-1">
@@ -958,7 +958,7 @@ export default function Analysis() {
                             {title.isShared ? `Shared with ${title.agencyCount - 1} other agencies` : 'Exclusive to this agency'}
                           </p>
                         </div>
-                        <div className="flex space-x-2" role="group" aria-label="Title status indicators">
+                        <div className="flex flex-col sm:flex-row gap-2" role="group" aria-label="Title status indicators">
                           <span
                             className={`px-3 py-1 text-xs font-semibold rounded-full border ${
                               title.impactLevel === 'HIGH' ?
