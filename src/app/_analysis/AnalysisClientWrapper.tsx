@@ -1,15 +1,18 @@
 // src/app/_analysis/AnalysisClientWrapper.tsx
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, Suspense, lazy } from 'react';
 import AgencySelector from '../../components/AgencySelector';
 import MetricCard from '../../components/MetricCard';
-import CrossCuttingAnalysis from '../../components/CrossCuttingAnalysis';
+import LoadingSpinner from '../../components/LoadingSpinner';
 import {
   WordCountTooltipContent,
   ChecksumTooltipContent,
   ComplexityTooltipContent
 } from '../../components/TooltipContent';
+
+// Lazy load heavy components
+const CrossCuttingAnalysis = lazy(() => import('../../components/CrossCuttingAnalysis'));
 
 interface Agency {
   id: number;
@@ -581,12 +584,25 @@ export default function AnalysisClientWrapper({
       </section>
 
       {/* Cross-Cutting Analysis Section */}
-      <CrossCuttingAnalysis
-        data={crossCuttingData}
-        loading={crossCuttingLoading}
-        severity={crossCuttingSeverity}
-        onAgencySelect={handleSharedAgencySelect}
-      />
+      <Suspense fallback={
+        <section className="space-y-6">
+          <div className="h-8 bg-muted rounded-md animate-pulse max-w-sm"></div>
+          <div className="bg-card border border-border rounded-lg p-6">
+            <LoadingSpinner
+              text="Loading cross-cutting analysis..."
+              className="text-center py-8"
+              showSpinner={true}
+            />
+          </div>
+        </section>
+      }>
+        <CrossCuttingAnalysis
+          data={crossCuttingData}
+          loading={crossCuttingLoading}
+          severity={crossCuttingSeverity}
+          onAgencySelect={handleSharedAgencySelect}
+        />
+      </Suspense>
     </>
   );
 }
