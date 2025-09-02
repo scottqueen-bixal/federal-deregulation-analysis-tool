@@ -23,13 +23,15 @@ RUN rm -rf src/generated/prisma
 RUN addgroup -g 1001 -S nodejs
 RUN adduser -S nextjs -u 1001
 
-# Create necessary directories and change ownership
-RUN mkdir -p /app/.next /app/node_modules && chown -R nextjs:nodejs /app/.next /app/node_modules
+# Create necessary directories with proper permissions for volumes
+# Note: We don't change ownership of /app since it will be mounted from host
+RUN mkdir -p /app/.next /app/node_modules
 
-# Change ownership of app directory and set script permissions
-RUN chown -R nextjs:nodejs /app
-RUN chmod +x /app/entrypoint.sh
-USER nextjs
+# Make entrypoint script executable (will be available when volume is mounted)
+RUN chmod +x /app/entrypoint.sh || true
+
+# Don't change to nextjs user yet - we need to handle this in entrypoint
+# since the volume mount will override ownership anyway
 
 # Expose port
 EXPOSE 3000
