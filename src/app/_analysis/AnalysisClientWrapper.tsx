@@ -41,7 +41,8 @@ type AnalysisAction =
   | { type: 'SET_LOADING'; payload: Partial<LoadingState> }
   | { type: 'SET_INCLUDE_SUB_AGENCIES'; payload: boolean }
   | { type: 'RESET_ANALYSIS_DATA' }
-  | { type: 'RESET_AGGREGATED_DATA' };
+  | { type: 'RESET_AGGREGATED_DATA' }
+  | { type: 'RESET_CROSS_CUTTING_DATA' };
 
 // Reducer function
 function analysisReducer(state: AnalysisState, action: AnalysisAction): AnalysisState {
@@ -69,6 +70,24 @@ function analysisReducer(state: AnalysisState, action: AnalysisAction): Analysis
 
     case 'RESET_AGGREGATED_DATA':
       return { ...state, aggregatedData: {} };
+
+    case 'RESET_CROSS_CUTTING_DATA':
+      return {
+        ...state,
+        crossCuttingData: {
+          summary: {
+            agencyName: '',
+            totalCfrTitles: 0,
+            sharedTitles: 0,
+            exclusiveTitles: 0,
+            highImpactShared: 0,
+            sharedWithAgencies: 0,
+            crossCuttingPercentage: 0,
+          },
+          crossCuttingTitles: [],
+          selectedAgency: { id: 0, name: '', slug: '' },
+        }
+      };
 
     default:
       return state;
@@ -194,6 +213,10 @@ export default function AnalysisClientWrapper({
     includeSubAgencies
   } = state;
 
+  console.log('Component render - current loading state:', loading);
+
+  console.log('Component render - current loading state:', loading);
+
   // Calculate cross-cutting severity score based on multiple factors
   const calculateCrossCuttingSeverity = useCallback((
     summary: CrossCuttingData['summary'],
@@ -250,14 +273,16 @@ export default function AnalysisClientWrapper({
     return agency?.children && agency.children.length > 0;
   }, [getSelectedAgencyDetails]);
 
-  const fetchAnalysis = useCallback(async (endpoint: string, agencyId?: number) => {
+  const fetchAnalysis = useCallback(async (endpoint: string, agencyId?: number, skipLoadingState = false) => {
     const targetAgencyId = agencyId || selectedAgency;
     if (!targetAgencyId) return;
 
-    // Set loading state based on endpoint
-    if (endpoint === 'word_count') dispatch({ type: 'SET_LOADING', payload: { wordCount: true } });
-    else if (endpoint === 'checksum') dispatch({ type: 'SET_LOADING', payload: { checksum: true } });
-    else if (endpoint === 'complexity_score') dispatch({ type: 'SET_LOADING', payload: { complexityScore: true } });
+    // Set loading state based on endpoint (unless skipLoadingState is true)
+    if (!skipLoadingState) {
+      if (endpoint === 'word_count') dispatch({ type: 'SET_LOADING', payload: { wordCount: true } });
+      else if (endpoint === 'checksum') dispatch({ type: 'SET_LOADING', payload: { checksum: true } });
+      else if (endpoint === 'complexity_score') dispatch({ type: 'SET_LOADING', payload: { complexityScore: true } });
+    }
 
     try {
       const url = `/api/analysis/${endpoint}/agency/${targetAgencyId}`;
@@ -294,8 +319,10 @@ export default function AnalysisClientWrapper({
     }
   }, [selectedAgency, analysisData.wordCount]);
 
-  const fetchCrossCuttingData = useCallback(async (agencyId: number) => {
-    dispatch({ type: 'SET_LOADING', payload: { crossCutting: true } });
+  const fetchCrossCuttingData = useCallback(async (agencyId: number, skipLoadingState = false) => {
+    if (!skipLoadingState) {
+      dispatch({ type: 'SET_LOADING', payload: { crossCutting: true } });
+    }
     try {
       const response = await fetch(`/api/analysis/cross-cutting/agency/${agencyId}`);
       const data = await response.json();
@@ -308,16 +335,18 @@ export default function AnalysisClientWrapper({
   }, []);
 
   // Function to fetch aggregated data for parent and all children
-  const fetchAggregatedAnalysis = useCallback(async (endpoint: string, parentAgencyId: number, existingWordCount?: number) => {
+  const fetchAggregatedAnalysis = useCallback(async (endpoint: string, parentAgencyId: number, existingWordCount?: number, skipLoadingState = false) => {
     // Get child IDs directly from agencies data instead of using state
     const selectedAgencyData = agencies.find(agency => agency.id === parentAgencyId);
     const childIds = selectedAgencyData?.children?.map(child => child.id) || [];
     const allAgencyIds = [parentAgencyId, ...childIds];
 
-    // Set loading state based on endpoint
-    if (endpoint === 'word_count') dispatch({ type: "SET_LOADING", payload: { wordCount: true } });
-    else if (endpoint === 'checksum') dispatch({ type: "SET_LOADING", payload: { checksum: true } });
-    else if (endpoint === 'complexity_score') dispatch({ type: "SET_LOADING", payload: { complexityScore: true } });
+    // Set loading state based on endpoint (unless skipLoadingState is true)
+    if (!skipLoadingState) {
+      if (endpoint === 'word_count') dispatch({ type: "SET_LOADING", payload: { wordCount: true } });
+      else if (endpoint === 'checksum') dispatch({ type: "SET_LOADING", payload: { checksum: true } });
+      else if (endpoint === 'complexity_score') dispatch({ type: "SET_LOADING", payload: { complexityScore: true } });
+    }
 
     try {
       // Fetch data for all agencies (parent + children) with rate limiting
@@ -469,26 +498,55 @@ export default function AnalysisClientWrapper({
       // Fetch aggregated data in correct order - word count first, then complexity
       dispatch({ type: "RESET_AGGREGATED_DATA" });
 
+      // Set all loading states before starting aggregated fetches
+      dispatch({ type: "SET_LOADING", payload: {
+        crossCutting: true,
+        wordCount: true,
+        checksum: true,
+        complexityScore: true
+      }});
+
+      // Use setTimeout to ensure loading states are processed
+      await new Promise(resolve => setTimeout(resolve, 0));
+
       // First fetch word count since complexity metrics depend on it
-      const wordCount = await fetchAggregatedAnalysis('word_count', selectedAgency) as number;
+      const wordCount = await fetchAggregatedAnalysis('word_count', selectedAgency, undefined, true) as number;
 
-      await fetchAggregatedAnalysis('checksum', selectedAgency);
+      await fetchAggregatedAnalysis('checksum', selectedAgency, undefined, true);
 
-      // Then fetch complexity which will use the word count data
-      await fetchAggregatedAnalysis('complexity_score', selectedAgency, wordCount);
+      // Ensure cross-cutting data is refreshed with loading state
+      await fetchCrossCuttingData(selectedAgency);
+
+      // Then fetch complexity last which will use the word count data
+      await fetchAggregatedAnalysis('complexity_score', selectedAgency, wordCount, true);
     } else {
       // Reset to individual agency data and fetch fresh data for just the main department
       dispatch({ type: "RESET_AGGREGATED_DATA" });
       dispatch({ type: "RESET_ANALYSIS_DATA" }); // Clear existing analysis data
 
+      // Set all loading states before starting parallel fetches
+      dispatch({ type: "SET_LOADING", payload: {
+        crossCutting: true,
+        wordCount: true,
+        checksum: true,
+        complexityScore: true
+      }});
+
+      // Use setTimeout to ensure the loading state update is processed before starting fetches
+      await new Promise(resolve => setTimeout(resolve, 0));
+
       // Fetch individual agency data only (not aggregated)
+      // Run most operations in parallel, then complexity score last
       await Promise.all([
-        fetchAnalysis('word_count', selectedAgency),
-        fetchAnalysis('checksum', selectedAgency),
-        fetchAnalysis('complexity_score', selectedAgency)
+        fetchCrossCuttingData(selectedAgency, true),
+        fetchAnalysis('word_count', selectedAgency, true),
+        fetchAnalysis('checksum', selectedAgency, true)
       ]);
+
+      // Fetch complexity score last (it may depend on word count data)
+      await fetchAnalysis('complexity_score', selectedAgency, true);
     }
-  }, [selectedAgency, agencies, fetchAggregatedAnalysis, fetchAnalysis]);
+  }, [selectedAgency, agencies, fetchAggregatedAnalysis, fetchAnalysis, fetchCrossCuttingData]);
 
   // Function to handle agency selection from shared agencies list
   const handleSharedAgencySelect = useCallback(async (agencyId: number) => {
@@ -498,14 +556,29 @@ export default function AnalysisClientWrapper({
 
     // Reset analysis data
     dispatch({ type: "RESET_ANALYSIS_DATA" });
+    dispatch({ type: "RESET_CROSS_CUTTING_DATA" });
+
+    // Set all loading states before starting parallel fetches
+    dispatch({ type: "SET_LOADING", payload: {
+      crossCutting: true,
+      wordCount: true,
+      checksum: true,
+      complexityScore: true
+    }});
+
+    // Use setTimeout to ensure the loading state update is processed before starting fetches
+    await new Promise(resolve => setTimeout(resolve, 0));
 
     // Fetch all data for the new agency in parallel
+    // Run most operations in parallel, then complexity score last
     await Promise.all([
-      fetchCrossCuttingData(agencyId),
-      fetchAnalysis('word_count', agencyId),
-      fetchAnalysis('checksum', agencyId),
-      fetchAnalysis('complexity_score', agencyId)
+      fetchCrossCuttingData(agencyId, true),
+      fetchAnalysis('word_count', agencyId, true),
+      fetchAnalysis('checksum', agencyId, true)
     ]);
+
+    // Fetch complexity score last (it may depend on word count data)
+    await fetchAnalysis('complexity_score', agencyId, true);
 
     // Safe window API usage
     if (typeof window !== 'undefined') {
@@ -526,37 +599,63 @@ export default function AnalysisClientWrapper({
       // Reset analysis data
       dispatch({ type: "RESET_ANALYSIS_DATA" });
       dispatch({ type: "RESET_AGGREGATED_DATA" });
+      dispatch({ type: "RESET_CROSS_CUTTING_DATA" });
 
       if (hasChildren) {
         // For main departments: set checkbox to checked and fetch aggregated data first
         dispatch({ type: "SET_INCLUDE_SUB_AGENCIES", payload: true });
 
+        // Set all loading states before starting aggregated fetches
+        dispatch({ type: "SET_LOADING", payload: {
+          crossCutting: true,
+          wordCount: true,
+          checksum: true,
+          complexityScore: true
+        }});
+
+        // Use setTimeout to ensure loading states are processed
+        await new Promise(resolve => setTimeout(resolve, 0));
+
         // Fetch aggregated data immediately without setTimeout to avoid race conditions
         try {
           // First fetch word count since complexity metrics depend on it
-          const wordCount = await fetchAggregatedAnalysis('word_count', agencyId) as number;
+          const wordCount = await fetchAggregatedAnalysis('word_count', agencyId, undefined, true) as number;
 
-          await fetchAggregatedAnalysis('checksum', agencyId);
+          await fetchAggregatedAnalysis('checksum', agencyId, undefined, true);
 
-          // Then fetch complexity which will use the word count data
-          await fetchAggregatedAnalysis('complexity_score', agencyId, wordCount);
+          // Also fetch cross-cutting data (with await to ensure proper loading state)
+          await fetchCrossCuttingData(agencyId);
+
+          // Then fetch complexity last which will use the word count data
+          await fetchAggregatedAnalysis('complexity_score', agencyId, wordCount, true);
         } catch (error) {
           console.error('Error in aggregated data fetch:', error);
         }
-
-        // Also fetch cross-cutting data
-        fetchCrossCuttingData(agencyId);
       } else {
         // For sub-agencies: set checkbox to unchecked and fetch individual data only
         dispatch({ type: "SET_INCLUDE_SUB_AGENCIES", payload: false });
 
+        // Set loading states before Promise.all to show individual metric loading states
+        dispatch({ type: "SET_LOADING", payload: {
+          crossCutting: true,
+          wordCount: true,
+          checksum: true,
+          complexityScore: true
+        }});
+
+        // Use setTimeout to ensure the loading state update is processed before starting fetches
+        await new Promise(resolve => setTimeout(resolve, 0));
+
         // Fetch individual agency data in parallel to avoid waterfalls
+        // Run most operations in parallel, then complexity score last
         await Promise.all([
-          fetchCrossCuttingData(agencyId),
-          fetchAnalysis('word_count', agencyId),
-          fetchAnalysis('checksum', agencyId),
-          fetchAnalysis('complexity_score', agencyId)
+          fetchCrossCuttingData(agencyId, true),
+          fetchAnalysis('word_count', agencyId, true),
+          fetchAnalysis('checksum', agencyId, true)
         ]);
+
+        // Fetch complexity score last (it may depend on word count data)
+        await fetchAnalysis('complexity_score', agencyId, true);
       }
     }
   }, [agencies, fetchAggregatedAnalysis, fetchCrossCuttingData, fetchAnalysis]);
