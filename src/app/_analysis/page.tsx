@@ -87,6 +87,7 @@ export default function Analysis() {
   const [showCrossCuttingTooltip, setShowCrossCuttingTooltip] = useState(false);
   const [includeSubAgencies, setIncludeSubAgencies] = useState(false);
   const [aggregatedData, setAggregatedData] = useState<AnalysisData>({});
+  const [expandedSharedSections, setExpandedSharedSections] = useState<Set<number>>(new Set());
 
   // Calculate cross-cutting severity score based on multiple factors
   const calculateCrossCuttingSeverity = (
@@ -286,6 +287,19 @@ export default function Analysis() {
   // Helper function to get the data to display (individual or aggregated)
   const getDisplayData = () => {
     return includeSubAgencies && selectedAgencyHasChildren() ? aggregatedData : analysisData;
+  };
+
+  // Function to toggle accordion sections
+  const toggleSharedSection = (titleIndex: number) => {
+    setExpandedSharedSections(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(titleIndex)) {
+        newSet.delete(titleIndex);
+      } else {
+        newSet.add(titleIndex);
+      }
+      return newSet;
+    });
   };
 
   return (
@@ -776,18 +790,59 @@ export default function Analysis() {
                         </div>
                       </article>
                       {title.isShared && title.sharedWith.length > 0 && (
-                        <div>
-                          <p className="text-sm text-muted-foreground">
-                            <span className="font-semibold text-card-foreground">Shared with:</span>
-                            <span className="ml-2" aria-label={`Shared with the following agencies: ${title.sharedWith.map(agency => agency.name).join(', ')}`}>
-                              {title.sharedWith.map((agency, agencyIndex) => (
-                                <span key={agency.id} className="inline-block">
-                                  {agencyIndex > 0 && ', '}
-                                  <span className="text-card-foreground font-medium">{agency.name}</span>
-                                </span>
+                        <div className="mt-4">
+                          <button
+                            type="button"
+                            onClick={() => toggleSharedSection(index)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                toggleSharedSection(index);
+                              }
+                            }}
+                            className="flex items-center justify-between w-full text-left text-sm font-semibold text-card-foreground hover:text-primary transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded-md px-2 py-1"
+                            aria-expanded={expandedSharedSections.has(index)}
+                            aria-controls={`shared-agencies-${index}`}
+                            id={`shared-toggle-${index}`}
+                          >
+                            <span>View agencies</span>
+                            <svg
+                              className={`w-4 h-4 transition-transform duration-200 ${
+                                expandedSharedSections.has(index) ? 'rotate-180' : ''
+                              }`}
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                              aria-hidden="true"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+                          <div
+                            id={`shared-agencies-${index}`}
+                            role="region"
+                            aria-labelledby={`shared-toggle-${index}`}
+                            className={`transition-all duration-300 ease-in-out ${
+                              expandedSharedSections.has(index)
+                                ? 'opacity-100 mt-3 bg-gray-800 border border-gray-700 rounded-lg p-4'
+                                : 'max-h-0 opacity-0 overflow-hidden'
+                            }`}
+                          >
+                            <ul
+                              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-1 gap-y-1 text-sm"
+                              role="list"
+                              aria-label={`${title.sharedWith.length} agencies sharing this CFR title`}
+                            >
+                              {title.sharedWith.map((agency) => (
+                                <li
+                                  key={agency.id}
+                                  className="text-white hover:text-gray-200 transition-colors duration-200 px-3 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm"
+                                >
+                                  <span className="font-medium">{agency.name}</span>
+                                </li>
                               ))}
-                            </span>
-                          </p>
+                            </ul>
+                          </div>
                         </div>
                       )}
                     </li>
