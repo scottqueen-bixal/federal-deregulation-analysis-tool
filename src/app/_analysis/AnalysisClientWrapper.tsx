@@ -1,7 +1,7 @@
 // src/app/_analysis/AnalysisClientWrapper.tsx
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, Suspense, lazy } from 'react';
+import { useMemo, useCallback, useReducer, Suspense, lazy } from 'react';
 import AgencySelector from '../../components/AgencySelector';
 import MetricCard from '../../components/MetricCard';
 import LoadingSpinner from '../../components/LoadingSpinner';
@@ -14,6 +14,96 @@ import {
 
 // Lazy load heavy components
 const CrossCuttingAnalysis = lazy(() => import('../../components/CrossCuttingAnalysis'));
+
+// State management types
+interface LoadingState {
+  wordCount: boolean;
+  checksum: boolean;
+  complexityScore: boolean;
+  crossCutting: boolean;
+}
+
+interface AnalysisState {
+  agencies: Agency[];
+  selectedAgency: number | null;
+  analysisData: AnalysisData;
+  crossCuttingData: CrossCuttingData;
+  aggregatedData: AnalysisData;
+  loading: LoadingState;
+  includeSubAgencies: boolean;
+}
+
+type AnalysisAction =
+  | { type: 'SET_SELECTED_AGENCY'; payload: number | null }
+  | { type: 'SET_ANALYSIS_DATA'; payload: Partial<AnalysisData> }
+  | { type: 'SET_CROSS_CUTTING_DATA'; payload: CrossCuttingData }
+  | { type: 'SET_AGGREGATED_DATA'; payload: Partial<AnalysisData> }
+  | { type: 'SET_LOADING'; payload: Partial<LoadingState> }
+  | { type: 'SET_INCLUDE_SUB_AGENCIES'; payload: boolean }
+  | { type: 'RESET_ANALYSIS_DATA' }
+  | { type: 'RESET_AGGREGATED_DATA' };
+
+// Reducer function
+function analysisReducer(state: AnalysisState, action: AnalysisAction): AnalysisState {
+  switch (action.type) {
+    case 'SET_SELECTED_AGENCY':
+      return { ...state, selectedAgency: action.payload };
+
+    case 'SET_ANALYSIS_DATA':
+      return { ...state, analysisData: { ...state.analysisData, ...action.payload } };
+
+    case 'SET_CROSS_CUTTING_DATA':
+      return { ...state, crossCuttingData: action.payload };
+
+    case 'SET_AGGREGATED_DATA':
+      return { ...state, aggregatedData: { ...state.aggregatedData, ...action.payload } };
+
+    case 'SET_LOADING':
+      return { ...state, loading: { ...state.loading, ...action.payload } };
+
+    case 'SET_INCLUDE_SUB_AGENCIES':
+      return { ...state, includeSubAgencies: action.payload };
+
+    case 'RESET_ANALYSIS_DATA':
+      return { ...state, analysisData: {} };
+
+    case 'RESET_AGGREGATED_DATA':
+      return { ...state, aggregatedData: {} };
+
+    default:
+      return state;
+  }
+}
+
+// Initial state factory
+function createInitialState(initialAgencies: Agency[]): AnalysisState {
+  return {
+    agencies: initialAgencies,
+    selectedAgency: null,
+    analysisData: {},
+    crossCuttingData: {
+      summary: {
+        agencyName: '',
+        totalCfrTitles: 0,
+        sharedTitles: 0,
+        exclusiveTitles: 0,
+        highImpactShared: 0,
+        sharedWithAgencies: 0,
+        crossCuttingPercentage: 0,
+      },
+      crossCuttingTitles: [],
+      selectedAgency: { id: 0, name: '', slug: '' },
+    },
+    aggregatedData: {},
+    loading: {
+      wordCount: false,
+      checksum: false,
+      complexityScore: false,
+      crossCutting: false,
+    },
+    includeSubAgencies: false,
+  };
+}
 
 interface Agency {
   id: number;
@@ -90,28 +180,19 @@ interface AnalysisClientWrapperProps {
 export default function AnalysisClientWrapper({
   initialAgencies
 }: AnalysisClientWrapperProps) {
-  const [agencies] = useState<Agency[]>(initialAgencies);
-  const [selectedAgency, setSelectedAgency] = useState<number | null>(null);
-  const [analysisData, setAnalysisData] = useState<AnalysisData>({});
-  const [crossCuttingData, setCrossCuttingData] = useState<CrossCuttingData>({
-    summary: {
-      agencyName: '',
-      totalCfrTitles: 0,
-      sharedTitles: 0,
-      exclusiveTitles: 0,
-      highImpactShared: 0,
-      sharedWithAgencies: 0,
-      crossCuttingPercentage: 0,
-    },
-    crossCuttingTitles: [],
-    selectedAgency: { id: 0, name: '', slug: '' },
-  });
-  const [wordCountLoading, setWordCountLoading] = useState(false);
-  const [checksumLoading, setChecksumLoading] = useState(false);
-  const [complexityScoreLoading, setComplexityScoreLoading] = useState(false);
-  const [crossCuttingLoading, setCrossCuttingLoading] = useState(false);
-  const [includeSubAgencies, setIncludeSubAgencies] = useState(false);
-  const [aggregatedData, setAggregatedData] = useState<AnalysisData>({});
+  // Use reducer for complex state management
+  const [state, dispatch] = useReducer(analysisReducer, initialAgencies, createInitialState);
+
+  // Destructure state for easier access
+  const {
+    agencies,
+    selectedAgency,
+    analysisData,
+    crossCuttingData,
+    aggregatedData,
+    loading,
+    includeSubAgencies
+  } = state;
 
   // Calculate cross-cutting severity score based on multiple factors
   const calculateCrossCuttingSeverity = useCallback((
@@ -174,9 +255,9 @@ export default function AnalysisClientWrapper({
     if (!targetAgencyId) return;
 
     // Set loading state based on endpoint
-    if (endpoint === 'word_count') setWordCountLoading(true);
-    else if (endpoint === 'checksum') setChecksumLoading(true);
-    else if (endpoint === 'complexity_score') setComplexityScoreLoading(true);
+    if (endpoint === 'word_count') dispatch({ type: 'SET_LOADING', payload: { wordCount: true } });
+    else if (endpoint === 'checksum') dispatch({ type: 'SET_LOADING', payload: { checksum: true } });
+    else if (endpoint === 'complexity_score') dispatch({ type: 'SET_LOADING', payload: { complexityScore: true } });
 
     try {
       const url = `/api/analysis/${endpoint}/agency/${targetAgencyId}`;
@@ -202,27 +283,27 @@ export default function AnalysisClientWrapper({
         }
       }
 
-      setAnalysisData(prev => ({ ...prev, ...data }));
+      dispatch({ type: 'SET_ANALYSIS_DATA', payload: data });
     } catch (error) {
       console.error('Error fetching analysis:', error);
     } finally {
       // Clear loading state
-      if (endpoint === 'word_count') setWordCountLoading(false);
-      else if (endpoint === 'checksum') setChecksumLoading(false);
-      else if (endpoint === 'complexity_score') setComplexityScoreLoading(false);
+      if (endpoint === 'word_count') dispatch({ type: 'SET_LOADING', payload: { wordCount: false } });
+      else if (endpoint === 'checksum') dispatch({ type: 'SET_LOADING', payload: { checksum: false } });
+      else if (endpoint === 'complexity_score') dispatch({ type: 'SET_LOADING', payload: { complexityScore: false } });
     }
   }, [selectedAgency, analysisData.wordCount]);
 
   const fetchCrossCuttingData = useCallback(async (agencyId: number) => {
-    setCrossCuttingLoading(true);
+    dispatch({ type: 'SET_LOADING', payload: { crossCutting: true } });
     try {
       const response = await fetch(`/api/analysis/cross-cutting/agency/${agencyId}`);
       const data = await response.json();
-      setCrossCuttingData(data);
+      dispatch({ type: 'SET_CROSS_CUTTING_DATA', payload: data });
     } catch (error) {
       console.error('Error fetching cross-cutting data:', error);
     } finally {
-      setCrossCuttingLoading(false);
+      dispatch({ type: 'SET_LOADING', payload: { crossCutting: false } });
     }
   }, []);
 
@@ -234,9 +315,9 @@ export default function AnalysisClientWrapper({
     const allAgencyIds = [parentAgencyId, ...childIds];
 
     // Set loading state based on endpoint
-    if (endpoint === 'word_count') setWordCountLoading(true);
-    else if (endpoint === 'checksum') setChecksumLoading(true);
-    else if (endpoint === 'complexity_score') setComplexityScoreLoading(true);
+    if (endpoint === 'word_count') dispatch({ type: "SET_LOADING", payload: { wordCount: true } });
+    else if (endpoint === 'checksum') dispatch({ type: "SET_LOADING", payload: { checksum: true } });
+    else if (endpoint === 'complexity_score') dispatch({ type: "SET_LOADING", payload: { complexityScore: true } });
 
     try {
       // Fetch data for all agencies (parent + children) with rate limiting
@@ -289,7 +370,7 @@ export default function AnalysisClientWrapper({
               totalWordCount / totalSections : 0)
           }
         };
-        setAggregatedData(prev => ({ ...prev, ...aggregatedResult }));
+        dispatch({ type: "SET_AGGREGATED_DATA", payload: aggregatedResult });
         return totalWordCount; // Return word count for use in complexity calculation
       } else if (endpoint === 'complexity_score') {
         // Instead of averaging, aggregate complexity properly
@@ -347,14 +428,14 @@ export default function AnalysisClientWrapper({
         aggregatedResult = { checksum: parentResult.checksum };
       }
 
-      setAggregatedData(prev => ({ ...prev, ...aggregatedResult }));
+      dispatch({ type: "SET_AGGREGATED_DATA", payload: aggregatedResult });
     } catch (error) {
       console.error('Error fetching aggregated analysis:', error);
     } finally {
       // Clear loading state
-      if (endpoint === 'word_count') setWordCountLoading(false);
-      else if (endpoint === 'checksum') setChecksumLoading(false);
-      else if (endpoint === 'complexity_score') setComplexityScoreLoading(false);
+      if (endpoint === 'word_count') dispatch({ type: "SET_LOADING", payload: { wordCount: false } });
+      else if (endpoint === 'checksum') dispatch({ type: "SET_LOADING", payload: { checksum: false } });
+      else if (endpoint === 'complexity_score') dispatch({ type: "SET_LOADING", payload: { complexityScore: false } });
     }
   }, [agencies, aggregatedData.wordCount]);
 
@@ -376,7 +457,7 @@ export default function AnalysisClientWrapper({
 
   // Function to handle toggle change
   const handleAggregationToggle = useCallback(async (checked: boolean) => {
-    setIncludeSubAgencies(checked);
+    dispatch({ type: "SET_INCLUDE_SUB_AGENCIES", payload: checked });
 
     if (!selectedAgency) return;
 
@@ -386,7 +467,7 @@ export default function AnalysisClientWrapper({
 
     if (checked && hasChildren) {
       // Fetch aggregated data in correct order - word count first, then complexity
-      setAggregatedData({});
+      dispatch({ type: "RESET_AGGREGATED_DATA" });
 
       // First fetch word count since complexity metrics depend on it
       const wordCount = await fetchAggregatedAnalysis('word_count', selectedAgency) as number;
@@ -397,8 +478,8 @@ export default function AnalysisClientWrapper({
       await fetchAggregatedAnalysis('complexity_score', selectedAgency, wordCount);
     } else {
       // Reset to individual agency data and fetch fresh data for just the main department
-      setAggregatedData({});
-      setAnalysisData({}); // Clear existing analysis data
+      dispatch({ type: "RESET_AGGREGATED_DATA" });
+      dispatch({ type: "RESET_ANALYSIS_DATA" }); // Clear existing analysis data
 
       // Fetch individual agency data only (not aggregated)
       await Promise.all([
@@ -411,12 +492,12 @@ export default function AnalysisClientWrapper({
 
   // Function to handle agency selection from shared agencies list
   const handleSharedAgencySelect = useCallback(async (agencyId: number) => {
-    setSelectedAgency(agencyId);
-    setIncludeSubAgencies(false); // Reset aggregation toggle
-    setAggregatedData({}); // Reset aggregated data
+    dispatch({ type: "SET_SELECTED_AGENCY", payload: agencyId });
+    dispatch({ type: "SET_INCLUDE_SUB_AGENCIES", payload: false }); // Reset aggregation toggle
+    dispatch({ type: "RESET_AGGREGATED_DATA" }); // Reset aggregated data
 
     // Reset analysis data
-    setAnalysisData({});
+    dispatch({ type: "RESET_ANALYSIS_DATA" });
 
     // Fetch all data for the new agency in parallel
     await Promise.all([
@@ -435,20 +516,20 @@ export default function AnalysisClientWrapper({
   const handleAgencyChange = useCallback(async (agencyId: number | null) => {
     if (!agencyId) return;
 
-    setSelectedAgency(agencyId);
-    setAggregatedData({}); // Reset aggregated data
+    dispatch({ type: "SET_SELECTED_AGENCY", payload: agencyId });
+    dispatch({ type: "RESET_AGGREGATED_DATA" }); // Reset aggregated data
     if (agencyId) {
       // Check if the newly selected agency has children
       const agency = agencies.find(a => a.id === agencyId);
       const hasChildren = !!(agency?.children && agency.children.length > 0);
 
       // Reset analysis data
-      setAnalysisData({});
-      setAggregatedData({});
+      dispatch({ type: "RESET_ANALYSIS_DATA" });
+      dispatch({ type: "RESET_AGGREGATED_DATA" });
 
       if (hasChildren) {
         // For main departments: set checkbox to checked and fetch aggregated data first
-        setIncludeSubAgencies(true);
+        dispatch({ type: "SET_INCLUDE_SUB_AGENCIES", payload: true });
 
         // Fetch aggregated data immediately without setTimeout to avoid race conditions
         try {
@@ -467,7 +548,7 @@ export default function AnalysisClientWrapper({
         fetchCrossCuttingData(agencyId);
       } else {
         // For sub-agencies: set checkbox to unchecked and fetch individual data only
-        setIncludeSubAgencies(false);
+        dispatch({ type: "SET_INCLUDE_SUB_AGENCIES", payload: false });
 
         // Fetch individual agency data in parallel to avoid waterfalls
         await Promise.all([
@@ -523,7 +604,7 @@ export default function AnalysisClientWrapper({
               'Total regulatory text volume'
             }
             tooltipContent={<WordCountTooltipContent />}
-            loading={wordCountLoading}
+            loading={loading.wordCount}
             loadingText="Loading..."
             valueColor="text-chart-1"
             ariaLabel={`Total word count: ${getDisplayData().wordCount?.toLocaleString() || 'Not available'}`}
@@ -532,7 +613,7 @@ export default function AnalysisClientWrapper({
                 <div className="flex justify-between py-1 border-b border-border/30">
                   <dt className="font-medium">Sections:</dt>
                   <dd className="text-card-foreground">
-                    {wordCountLoading || complexityScoreLoading ? (
+                    {loading.wordCount || loading.complexityScore ? (
                       <span className="text-gray-400">Loading...</span>
                     ) : (
                       getDisplayData().metrics?.totalSections || 'N/A'
@@ -542,7 +623,7 @@ export default function AnalysisClientWrapper({
                 <div className="flex justify-between py-1 border-b border-border/30">
                   <dt className="font-medium">Avg Words/Section:</dt>
                   <dd className="text-card-foreground">
-                    {wordCountLoading || complexityScoreLoading ? (
+                    {loading.wordCount || loading.complexityScore ? (
                       <span className="text-gray-400">Loading...</span>
                     ) : (
                       getDisplayData().metrics?.avgWordsPerSection?.toFixed(1) || 'N/A'
@@ -565,7 +646,7 @@ export default function AnalysisClientWrapper({
               'Verification hash'
             }
             tooltipContent={<ChecksumTooltipContent />}
-            loading={checksumLoading}
+            loading={loading.checksum}
             loadingText="Calculating checksum..."
             valueColor="text-chart-2"
             ariaLabel={`Document checksum: ${getDisplayData().checksum || 'Not available'}`}
@@ -590,7 +671,7 @@ export default function AnalysisClientWrapper({
               </div>
             }
             tooltipContent={<ComplexityTooltipContent />}
-            loading={complexityScoreLoading}
+            loading={loading.complexityScore}
             loadingText="Calculating..."
             valueColor={
               !getDisplayData().relativeComplexityScore ? 'text-muted-foreground' :
@@ -619,7 +700,7 @@ export default function AnalysisClientWrapper({
       }>
         <CrossCuttingAnalysis
           data={crossCuttingData}
-          loading={crossCuttingLoading}
+          loading={loading.crossCutting}
           severity={crossCuttingSeverity}
           onAgencySelect={handleSharedAgencySelect}
         />
