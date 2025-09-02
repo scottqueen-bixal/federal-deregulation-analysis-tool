@@ -39,19 +39,16 @@ function LoadingSpinnerBase({
   const loaderClasses = `${styles.loader} ${sizeClassMap[size]}`;
 
   return (
-    <div className={`flex items-center gap-2 ${paddingClass} ${className}`}>
+    <div className={`flex items-center gap-2 ${paddingClass} ${className}`} role="status" aria-live="polite">
       {showSpinner && (
         <div
           className={`${loaderClasses} ${spinnerClassName}`}
-          role="status"
-          aria-label="Loading"
+          aria-hidden="true"
         />
       )}
       {text && (
         <span
           className={`${baseTextClass} ${textClassName}`}
-          role="status"
-          aria-live="polite"
         >
           {text}
         </span>

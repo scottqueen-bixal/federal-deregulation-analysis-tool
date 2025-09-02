@@ -49,7 +49,7 @@ export default React.memo(function AgencySelector({
   }, [getSelectedAgencyDetails]);
 
   return (
-    <section aria-labelledby="agency-selection-heading" className="mb-12">
+    <section id="agency-selector" aria-labelledby="agency-selection-heading" className="mb-12">
       <h2 id="agency-selection-heading" className="sr-only">Agency Selection</h2>
       <div className="bg-card border border-border rounded-lg p-8 shadow-sm">
         <form className="space-y-6">

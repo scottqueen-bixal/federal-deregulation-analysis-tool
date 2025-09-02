@@ -48,9 +48,15 @@ export default async function Home() {
       {/* Skip Navigation */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-primary text-primary-foreground px-4 py-2 rounded-md z-50 font-medium"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-primary text-primary-foreground px-4 py-2 rounded-md z-50 font-medium focus:outline-none focus:ring-[3px] focus:ring-ring focus:ring-offset-2"
       >
         Skip to main content
+      </a>
+      <a
+        href="#agency-selector"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-40 bg-primary text-primary-foreground px-4 py-2 rounded-md z-50 font-medium focus:outline-none focus:ring-[3px] focus:ring-ring focus:ring-offset-2"
+      >
+        Skip to agency selector
       </a>
 
       <div className="container mx-auto px-6 py-8 max-w-7xl">

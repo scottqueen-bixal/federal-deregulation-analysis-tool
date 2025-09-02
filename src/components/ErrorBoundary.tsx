@@ -135,47 +135,51 @@ class ErrorBoundary extends Component<Props, State> {
       // Default error UI
       return (
         <div className="min-h-[400px] flex items-center justify-center p-6">
-          <div className="max-w-md w-full bg-card border border-destructive/20 rounded-lg p-6 shadow-lg">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="flex-shrink-0">
-                <AlertTriangleIcon className="h-8 w-8 text-destructive" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-card-foreground">
-                  Something went wrong
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  We encountered an unexpected error. Please try again.
-                </p>
-              </div>
+                  <div className="bg-card border border-destructive rounded-lg p-6 max-w-2xl mx-auto shadow-lg">
+          {/* Error Icon and Message */}
+          <div className="flex items-start space-x-4 mb-6">
+            <div className="flex-shrink-0">
+              <AlertTriangleIcon className="h-8 w-8 text-destructive" aria-hidden="true" />
             </div>
-
-            {/* Error Actions */}
-            <div className="flex flex-col sm:flex-row gap-3 mb-4">
-              <button
-                onClick={this.handleRetry}
-                className="flex items-center justify-center space-x-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
-              >
-                <RefreshIcon className="h-4 w-4" />
-                <span>Try Again</span>
-              </button>
-
-              <button
-                onClick={this.handleReload}
-                className="flex items-center justify-center space-x-2 px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors"
-              >
-                <RefreshIcon className="h-4 w-4" />
-                <span>Reload Page</span>
-              </button>
-
-              <button
-                onClick={this.handleGoHome}
-                className="flex items-center justify-center space-x-2 px-4 py-2 bg-muted text-muted-foreground rounded-md hover:bg-muted/80 transition-colors"
-              >
-                <HomeIcon className="h-4 w-4" />
-                <span>Go Home</span>
-              </button>
+            <div>
+              <h2 className="text-lg font-semibold text-card-foreground">
+                Something went wrong
+              </h2>
+              <p className="text-sm text-muted-foreground" role="alert" aria-live="assertive">
+                We encountered an unexpected error. Please try again.
+              </p>
             </div>
+          </div>
+
+          {/* Error Actions */}
+          <div className="flex flex-col sm:flex-row gap-3 mb-4">
+            <button
+              onClick={this.handleRetry}
+              className="flex items-center justify-center space-x-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors focus:outline-none focus:ring-[3px] focus:ring-ring focus:ring-offset-2"
+              aria-label="Try to recover from the error and continue"
+            >
+              <RefreshIcon className="h-4 w-4" aria-hidden="true" />
+              <span>Try Again</span>
+            </button>
+
+            <button
+              onClick={this.handleReload}
+              className="flex items-center justify-center space-x-2 px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors focus:outline-none focus:ring-[3px] focus:ring-ring focus:ring-offset-2"
+              aria-label="Reload the entire page to reset the application"
+            >
+              <RefreshIcon className="h-4 w-4" aria-hidden="true" />
+              <span>Reload Page</span>
+            </button>
+
+            <button
+              onClick={this.handleGoHome}
+              className="flex items-center justify-center space-x-2 px-4 py-2 bg-muted text-muted-foreground rounded-md hover:bg-muted/80 transition-colors focus:outline-none focus:ring-[3px] focus:ring-ring focus:ring-offset-2"
+              aria-label="Navigate to the home page"
+            >
+              <HomeIcon className="h-4 w-4" aria-hidden="true" />
+              <span>Go Home</span>
+            </button>
+          </div>
 
             {/* Error Details (for development) */}
             {shouldShowDetails && error && (

@@ -78,3 +78,44 @@ Caching Strategy: Evaluate if I am caching data that should be dynamic. For data
 Environment Variables: Is my DATABASE_URL stored securely in an .env file? Confirm that it is NOT prefixed with NEXT_PUBLIC_, which would dangerously expose it to the client-side.
 
 Schema Management: Is the schema.prisma file well-organized and are migrations being handled correctly with prisma migrate?
+
+### Tailwind css
+
+You are an expert front-end developer and UI engineer with a deep understanding of Tailwind CSS best practices for creating scalable and consistent design systems. Your task is to perform a thorough review of my project, focusing on how I use Tailwind CSS.
+
+Please analyze my tailwind.config.js file and the usage of utility classes throughout the codebase. The primary goal is to ensure I am building a strict, consistent, and maintainable design system, not just using Tailwind as a random collection of styles.
+
+For each issue you identify, please:
+
+Specify the file and line number where the issue occurs.
+
+Explain the mistake and why it leads to inconsistency or deviates from professional best practices.
+
+Provide a corrected code snippet or a clear strategy for refactoring.
+
+Here are the key areas to focus on during your review:
+
+## 1. Tailwind Configuration (tailwind.config.js)
+Theme Overriding vs. Extending: This is the most critical check. Am I defining my design tokens (colors, spacing, etc.) directly under the theme object to override Tailwind's defaults? Or am I placing them inside theme.extend, which keeps all the default Tailwind classes available and leads to inconsistency? I should be overriding, not extending.
+
+Comprehensive Custom Theme: Have I defined a complete set of custom tokens for the most important properties? Specifically, check for:
+
+colors: A custom color palette (e.g., primary, secondary, neutral-100) should be defined, replacing Tailwind's entire default palette.
+
+spacing: A custom spacing scale (for margins, padding, width, height) that fits my design.
+
+fontSize: A custom typographic scale.
+
+fontWeight, fontFamily, lineHeight, borderRadius, boxShadow.
+
+Selective Inclusion: If I do need a subset of Tailwind's default colors (like a specific shade of blue), am I importing it correctly from tailwindcss/colors within my custom theme definition, rather than keeping the entire default theme?
+
+## 2. Utility Class Usage
+Adherence to the Design System: Scan my components (.tsx files) to see if I am consistently using the custom theme tokens defined in my config. For instance, if my theme only defines bg-primary, flag any usage of default classes like bg-red-500 or bg-blue-300.
+
+Use of Arbitrary Values: Am I using arbitrary values (e.g., mt-[13px], text-[#ABC123]) appropriately? They should be reserved for rare, one-off exceptions. If an arbitrary value appears multiple times, it's a sign that it should be added to the tailwind.config.js theme.
+
+Class Name Consistency: Are developers on the team using the established design system, or are they falling back on default Tailwind values that were not intentionally included in the project's theme?
+
+## 3. Component Abstraction
+Component-Based Styling: While not explicitly in the video, check if I am creating reusable React components for common UI elements (like buttons, cards, inputs) instead of repeating long strings of Tailwind classes. This enforces consistency at the component level.
