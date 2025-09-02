@@ -133,7 +133,12 @@ export default function Analysis() {
 
   // Helper function to get selected agency details
   const getSelectedAgencyDetails = () => {
-    return agencies.find(agency => agency.id === selectedAgency);
+    console.log(`[DEBUG] getSelectedAgencyDetails - selectedAgency: ${selectedAgency}`);
+    console.log(`[DEBUG] getSelectedAgencyDetails - agencies.length: ${agencies.length}`);
+    console.log(`[DEBUG] getSelectedAgencyDetails - agencies[0]:`, agencies[0]?.name);
+    const found = agencies.find(agency => agency.id === selectedAgency);
+    console.log(`[DEBUG] getSelectedAgencyDetails - found agency:`, found?.name);
+    return found;
   };
 
   // Helper function to check if selected agency has children
@@ -145,7 +150,11 @@ export default function Analysis() {
   // Helper function to get child agency IDs
   const getChildAgencyIds = () => {
     const agency = getSelectedAgencyDetails();
-    return agency?.children?.map(child => child.id) || [];
+    const childIds = agency?.children?.map(child => child.id) || [];
+    console.log(`[DEBUG] getChildAgencyIds - Selected agency:`, agency?.name, `(ID: ${agency?.id})`);
+    console.log(`[DEBUG] getChildAgencyIds - Children count:`, agency?.children?.length || 0);
+    console.log(`[DEBUG] getChildAgencyIds - Child IDs:`, childIds);
+    return childIds;
   };
 
   useEffect(() => {
@@ -213,9 +222,17 @@ export default function Analysis() {
   };
 
   // Function to fetch aggregated data for parent and all children
-  const fetchAggregatedAnalysis = async (endpoint: string, parentAgencyId: number) => {
-    const childIds = getChildAgencyIds();
+  const fetchAggregatedAnalysis = async (endpoint: string, parentAgencyId: number, existingWordCount?: number) => {
+    // Get child IDs directly from agencies data instead of using state
+    const selectedAgencyData = agencies.find(agency => agency.id === parentAgencyId);
+    const childIds = selectedAgencyData?.children?.map(child => child.id) || [];
     const allAgencyIds = [parentAgencyId, ...childIds];
+
+    console.log(`[DEBUG] fetchAggregatedAnalysis - Parent ID: ${parentAgencyId}`);
+    console.log(`[DEBUG] fetchAggregatedAnalysis - Child IDs: ${childIds.join(', ')}`);
+    console.log(`[DEBUG] fetchAggregatedAnalysis - All agency IDs: ${allAgencyIds.join(', ')}`);
+    console.log(`[DEBUG] fetchAggregatedAnalysis - includeSubAgencies: ${includeSubAgencies}`);
+    console.log(`[DEBUG] fetchAggregatedAnalysis - selectedAgencyHasChildren: ${!!selectedAgencyData?.children?.length}`);
 
     // Set loading state based on endpoint
     if (endpoint === 'word_count') setWordCountLoading(true);
@@ -223,35 +240,132 @@ export default function Analysis() {
     else if (endpoint === 'complexity_score') setComplexityScoreLoading(true);
 
     try {
-      // Fetch data for all agencies (parent + children)
-      const promises = allAgencyIds.map(async (agencyId) => {
-        const url = `/api/analysis/${endpoint}/agency/${agencyId}`;
-        const res = await fetch(url);
-        return await res.json();
-      });
+      // Fetch data for all agencies (parent + children) with rate limiting
+      const BATCH_SIZE = 5; // Process in smaller batches
+      const results: (Record<string, unknown> | null)[] = [];
 
-      const results = await Promise.all(promises);
+      for (let i = 0; i < allAgencyIds.length; i += BATCH_SIZE) {
+        const batch = allAgencyIds.slice(i, i + BATCH_SIZE);
+        console.log(`[${endpoint}] Processing batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(allAgencyIds.length/BATCH_SIZE)}: agencies ${batch.join(', ')}`);
+
+        const batchPromises = batch.map(async (agencyId) => {
+          const url = `/api/analysis/${endpoint}/agency/${agencyId}`;
+          try {
+            const res = await fetch(url);
+            if (!res.ok) {
+              console.error(`Failed to fetch ${endpoint} for agency ${agencyId}:`, res.status, res.statusText);
+              return null;
+            }
+            const data = await res.json();
+            console.log(`[${endpoint}] Success for agency ${agencyId}:`, data.complexity_score || data.wordCount || 'data fetched');
+            return data;
+          } catch (error) {
+            console.error(`[${endpoint}] Error fetching agency ${agencyId}:`, error);
+            return null;
+          }
+        });
+
+        const batchResults = await Promise.all(batchPromises);
+        results.push(...batchResults);
+
+        // Small delay between batches to avoid overwhelming the server
+        if (i + BATCH_SIZE < allAgencyIds.length) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+      const validResults = results.filter(result => result !== null);
+
+      // Debug logging for aggregation
+      console.log(`[${endpoint}] Fetching data for agencies:`, allAgencyIds);
+      console.log(`[${endpoint}] Valid results count:`, validResults.length);
+      console.log(`[${endpoint}] Results:`, validResults.map(r => ({
+        agencyId: r.agencyId,
+        complexity_score: r.complexity_score,
+        wordCount: r.wordCount,
+        sections: r.calculation_details?.total_sections
+      })));
 
       // Aggregate the results based on endpoint type
-      let aggregatedResult = {};
+      let aggregatedResult: Record<string, unknown> = {};
 
       if (endpoint === 'word_count') {
-        const totalWordCount = results.reduce((sum, result) => sum + (result.wordCount || 0), 0);
+        const totalWordCount = validResults.reduce((sum, result) => sum + (result.wordCount || 0), 0);
         aggregatedResult = { wordCount: totalWordCount };
+        setAggregatedData(prev => ({ ...prev, ...aggregatedResult }));
+        return totalWordCount; // Return word count for use in complexity calculation
       } else if (endpoint === 'complexity_score') {
-        // Average complexity scores and round to whole numbers
-        const validScores = results.filter(result => result.complexity_score !== undefined);
+        // Instead of averaging, aggregate complexity properly
+        const validScores = validResults.filter(result => result.complexity_score !== undefined);
+        console.log(`[complexity_score] Valid scores found:`, validScores.length);
+        console.log(`[complexity_score] Individual scores:`, validScores.map(r => ({
+          agencyId: r.agencyId,
+          score: r.complexity_score,
+          scoreType: typeof r.complexity_score,
+          isNumber: Number.isInteger(r.complexity_score)
+        })));
+
         if (validScores.length > 0) {
-          const avgComplexity = validScores.reduce((sum, result) => sum + result.complexity_score, 0) / validScores.length;
-          const avgRelativeComplexity = validScores.reduce((sum, result) => sum + (result.relative_complexity_score || 0), 0) / validScores.length;
+          // Method 1: Sum all complexity scores (additive complexity)
+          const totalComplexity = validScores.reduce((sum, result) => {
+            const score = Number(result.complexity_score) || 0;
+            console.log(`[complexity_score] Adding ${score} (type: ${typeof score}) to sum ${sum}`);
+            return sum + score;
+          }, 0);
+
+          console.log(`[complexity_score] Final totalComplexity:`, totalComplexity);
+
+          // Get total sections across all agencies for proper metrics
+          const totalSections = validScores.reduce((sum, result) =>
+            sum + (result.calculation_details?.total_sections || 0), 0);
+
+          // Use the passed word count or try to get from current state
+          const aggregatedWordCount = existingWordCount || aggregatedData.wordCount || 0;
+
+          // For relative score, calculate against the appropriate max
+          let relativeComplexity = 0;
+          try {
+            // Use max-aggregated endpoint for aggregated complexity comparison
+            const maxResponse = await fetch('/api/analysis/complexity_score/max-aggregated?bustCache=true');
+            if (maxResponse.ok) {
+              const maxData = await maxResponse.json();
+              const maxAggregatedScore = maxData.max_aggregated_complexity_score;
+              if (maxAggregatedScore > 0) {
+                relativeComplexity = Math.round((totalComplexity / maxAggregatedScore) * 100);
+                // Debug logging
+                console.log(`Aggregated complexity calculation:`, {
+                  totalComplexity,
+                  maxAggregatedScore,
+                  relativeComplexity,
+                  isOverMax: relativeComplexity > 100,
+                  wordCount: aggregatedWordCount,
+                  sections: totalSections
+                });
+
+                // Cap at 100 to prevent display issues
+                relativeComplexity = Math.min(relativeComplexity, 100);
+              }
+            }
+          } catch (error) {
+            console.warn('Could not fetch max aggregated score for relative calculation:', error);
+            // Fallback: use the highest relative score among constituent agencies
+            relativeComplexity = Math.max(...validScores.map(result => result.relative_complexity_score || 0));
+          }
+
           aggregatedResult = {
-            complexityScore: Math.round(avgComplexity),
-            relativeComplexityScore: Math.round(avgRelativeComplexity)
+            complexityScore: Math.round(totalComplexity),
+            relativeComplexityScore: relativeComplexity,
+            metrics: {
+              totalSections: totalSections,
+              totalWords: aggregatedWordCount, // Use actual aggregated word count
+              avgWordsPerSection: Math.round(totalSections > 0 && aggregatedWordCount > 0 ?
+                aggregatedWordCount / totalSections : 0),
+              hierarchyDepth: Math.max(...validScores.map(result => result.hierarchy_depth || 3))
+            }
           };
         }
       } else if (endpoint === 'checksum') {
         // For checksum, we can create a combined hash or just show the parent's checksum
-        const parentResult = results[0];
+        const parentResult = validResults[0];
         aggregatedResult = { checksum: parentResult.checksum };
       }
 
@@ -272,21 +386,53 @@ export default function Analysis() {
 
     if (!selectedAgency) return;
 
-    if (checked && selectedAgencyHasChildren()) {
-      // Fetch aggregated data
+    // Get agency details directly instead of relying on state
+    const selectedAgencyData = agencies.find(agency => agency.id === selectedAgency);
+    const hasChildren = selectedAgencyData?.children && selectedAgencyData.children.length > 0;
+
+    console.log(`[DEBUG] handleAggregationToggle - checked: ${checked}`);
+    console.log(`[DEBUG] handleAggregationToggle - selectedAgency: ${selectedAgency}`);
+    console.log(`[DEBUG] handleAggregationToggle - selectedAgencyData:`, selectedAgencyData?.name);
+    console.log(`[DEBUG] handleAggregationToggle - hasChildren: ${hasChildren}`);
+
+    if (checked && hasChildren) {
+      // Fetch aggregated data in correct order - word count first, then complexity
       setAggregatedData({});
-      await fetchAggregatedAnalysis('word_count', selectedAgency);
+
+      // First fetch word count since complexity metrics depend on it
+      const wordCount = await fetchAggregatedAnalysis('word_count', selectedAgency) as number;
+
       await fetchAggregatedAnalysis('checksum', selectedAgency);
-      await fetchAggregatedAnalysis('complexity_score', selectedAgency);
+
+      // Then fetch complexity which will use the word count data
+      await fetchAggregatedAnalysis('complexity_score', selectedAgency, wordCount);
     } else {
-      // Reset to individual agency data
+      // Reset to individual agency data and fetch fresh data for just the main department
+      console.log(`[DEBUG] handleAggregationToggle - switching to individual agency data`);
       setAggregatedData({});
+      setAnalysisData({}); // Clear existing analysis data
+
+      // Fetch individual agency data only (not aggregated)
+      fetchAnalysis('word_count', selectedAgency);
+      fetchAnalysis('checksum', selectedAgency);
+      fetchAnalysis('complexity_score', selectedAgency);
     }
   };
 
   // Helper function to get the data to display (individual or aggregated)
   const getDisplayData = () => {
-    return includeSubAgencies && selectedAgencyHasChildren() ? aggregatedData : analysisData;
+    const shouldUseAggregated = includeSubAgencies && selectedAgencyHasChildren();
+
+    if (shouldUseAggregated) {
+      // Only return aggregated data if it has actual data (not empty)
+      if (aggregatedData.wordCount !== undefined) {
+        return aggregatedData;
+      }
+      // If aggregated data is still loading, return empty object to show loading states
+      return {};
+    }
+
+    return analysisData;
   };
 
   // Function to toggle accordion sections
@@ -367,17 +513,50 @@ export default function Analysis() {
                     selectedAgency={selectedAgency}
                     onAgencyChange={(agencyId) => {
                       setSelectedAgency(agencyId);
-                      setIncludeSubAgencies(false); // Reset aggregation toggle
                       setAggregatedData({}); // Reset aggregated data
                       setExpandedSharedSections(new Set()); // Close all accordions
                       if (agencyId) {
+                        // Check if the newly selected agency has children
+                        const agency = agencies.find(a => a.id === agencyId);
+                        const hasChildren = !!(agency?.children && agency.children.length > 0);
+
                         // Reset analysis data
                         setAnalysisData({});
-                        // Fetch all data
-                        fetchCrossCuttingData(agencyId);
-                        fetchAnalysis('word_count', agencyId);
-                        fetchAnalysis('checksum', agencyId);
-                        fetchAnalysis('complexity_score', agencyId);
+                        setAggregatedData({});
+
+                        if (hasChildren) {
+                          // For main departments: set checkbox to checked and fetch aggregated data first
+                          setIncludeSubAgencies(true);
+
+                          console.log(`[DEBUG] Agency selection - selecting department with children: ${agency.name}`);
+
+                          // Fetch aggregated data immediately without setTimeout to avoid race conditions
+                          (async () => {
+                            try {
+                              // First fetch word count since complexity metrics depend on it
+                              const wordCount = await fetchAggregatedAnalysis('word_count', agencyId) as number;
+
+                              await fetchAggregatedAnalysis('checksum', agencyId);
+
+                              // Then fetch complexity which will use the word count data
+                              await fetchAggregatedAnalysis('complexity_score', agencyId, wordCount);
+                            } catch (error) {
+                              console.error('Error in aggregated data fetch:', error);
+                            }
+                          })();
+
+                          // Also fetch cross-cutting data
+                          fetchCrossCuttingData(agencyId);
+                        } else {
+                          // For sub-agencies: set checkbox to unchecked and fetch individual data only
+                          setIncludeSubAgencies(false);
+
+                          // Fetch individual agency data
+                          fetchCrossCuttingData(agencyId);
+                          fetchAnalysis('word_count', agencyId);
+                          fetchAnalysis('checksum', agencyId);
+                          fetchAnalysis('complexity_score', agencyId);
+                        }
                       }
                     }}
                     loading={agenciesLoading}
@@ -487,6 +666,18 @@ export default function Analysis() {
                   'Total regulatory text volume'
                 }
               </p>
+              {getDisplayData().metrics && !complexityScoreLoading && (
+                <dl className="mt-4 space-y-2 text-sm text-muted-foreground">
+                  <div className="flex justify-between py-1 border-b border-border/30">
+                    <dt className="font-medium">Sections:</dt>
+                    <dd className="text-card-foreground">{getDisplayData().metrics?.totalSections}</dd>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-border/30">
+                    <dt className="font-medium">Avg Words/Section:</dt>
+                    <dd className="text-card-foreground">{getDisplayData().metrics?.avgWordsPerSection?.toFixed(1)}</dd>
+                  </div>
+                </dl>
+              )}
             </article>
 
             <article className="bg-card border border-border rounded-lg p-8 shadow-sm hover:shadow-md transition-shadow duration-200">
@@ -619,7 +810,7 @@ export default function Analysis() {
                 )}
                 <p className="text-sm text-muted-foreground mb-2">
                   {includeSubAgencies && selectedAgencyHasChildren() ?
-                    'Average complexity across department' :
+                    'Relative to most complex department (including sub-agencies)' :
                     'Relative to most complex agency'
                   }
                   {getDisplayData().complexityScore && (
@@ -629,26 +820,6 @@ export default function Analysis() {
                   )}
                 </p>
               </div>
-              {getDisplayData().metrics && !complexityScoreLoading && (
-                <dl className="mt-4 space-y-2 text-sm text-muted-foreground">
-                  <div className="flex justify-between py-1 border-b border-border/30">
-                    <dt className="font-medium">Sections:</dt>
-                    <dd className="text-card-foreground">{getDisplayData().metrics?.totalSections}</dd>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-border/30">
-                    <dt className="font-medium">Total Words:</dt>
-                    <dd className="text-card-foreground">{getDisplayData().metrics?.totalWords}</dd>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-border/30">
-                    <dt className="font-medium">Avg Words/Section:</dt>
-                    <dd className="text-card-foreground">{getDisplayData().metrics?.avgWordsPerSection?.toFixed(1)}</dd>
-                  </div>
-                  <div className="flex justify-between py-1">
-                    <dt className="font-medium">Hierarchy Depth:</dt>
-                    <dd className="text-card-foreground">{getDisplayData().metrics?.hierarchyDepth || 'N/A'}</dd>
-                  </div>
-                </dl>
-              )}
             </article>
           </div>
         </section>
