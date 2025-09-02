@@ -66,9 +66,9 @@ export default function MetricCard({
         )}
       </div>
 
-      <p className="text-sm text-muted-foreground">
+      <div className="text-sm text-muted-foreground">
         {typeof description === 'string' ? description : <>{description}</>}
-      </p>
+      </div>
 
       {additionalContent && !loading && (
         <div className="mt-4">
