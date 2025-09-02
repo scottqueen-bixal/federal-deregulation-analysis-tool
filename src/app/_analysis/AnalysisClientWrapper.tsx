@@ -729,7 +729,10 @@ export default function AnalysisClientWrapper({
                     {loading.wordCount || loading.complexityScore ? (
                       <span className="text-gray-400">Loading...</span>
                     ) : (
-                      getDisplayData().metrics?.avgWordsPerSection?.toFixed(1) || 'N/A'
+                      (() => {
+                        const avgWords = getDisplayData().metrics?.avgWordsPerSection;
+                        return avgWords && avgWords > 0 ? avgWords.toFixed(1) : 'N/A';
+                      })()
                     )}
                   </dd>
                 </div>
