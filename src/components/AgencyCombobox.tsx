@@ -212,7 +212,7 @@ export default function AgencyCombobox({
         type="button"
         onClick={handleToggle}
         disabled={disabled || loading}
-        className="w-full p-4 bg-input border border-border rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all duration-200 font-medium flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full p-4 bg-input border border-border rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all duration-200 font-medium flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
         aria-expanded={isOpen}
         aria-haspopup="listbox"
       >
@@ -278,7 +278,7 @@ export default function AgencyCombobox({
                         key={agency.id}
                         type="button"
                         onClick={() => handleAgencySelect(agency)}
-                        className={`w-full text-left px-4 py-2 text-sm transition-colors duration-150 bg-white dark:bg-gray-800 ${
+                        className={`w-full text-left px-4 py-2 text-sm transition-colors duration-150 bg-white dark:bg-gray-800 cursor-pointer ${
                           isChild ? 'pl-8' : ''
                         } ${
                           isHighlighted

@@ -346,7 +346,7 @@ export default function Analysis() {
                 The Code of Federal Regulations (CFR) is the official legal print publication containing the codification of the general and permanent rules published in the Federal Register by the departments and agencies of the Federal Government. The Electronic Code of Federal Regulations (eCFR) is a continuously updated online version of the CFR. It is not an official legal edition of the CFR.{' '}
                 <a
                   href="https://www.ecfr.gov/reader-aids/understanding-the-ecfr/what-is-the-ecfr"
-                  className="text-primary hover:text-primary/80 underline underline-offset-2 transition-colors duration-200"
+                  className="text-primary hover:text-primary/80 underline underline-offset-2 transition-colors duration-200 cursor-pointer"
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Learn more about the eCFR, its status, and the editorial process (opens in new tab)"
@@ -393,7 +393,7 @@ export default function Analysis() {
                   <div className="mt-6 p-4 bg-muted/50 border border-border rounded-lg">
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
-                        <label htmlFor="aggregation-toggle" className="text-sm font-semibold text-card-foreground">
+                        <label htmlFor="aggregation-toggle" className="text-sm font-semibold text-card-foreground cursor-pointer">
                           Include Sub-Agency Data
                         </label>
                         <p className="text-xs text-muted-foreground mt-1">
@@ -406,7 +406,7 @@ export default function Analysis() {
                           type="checkbox"
                           checked={includeSubAgencies}
                           onChange={(e) => handleAggregationToggle(e.target.checked)}
-                          className="h-4 w-4 text-primary focus:ring-ring border-border rounded transition-colors duration-200"
+                          className="h-4 w-4 text-primary focus:ring-ring border-border rounded transition-colors duration-200 cursor-pointer"
                         />
                       </div>
                     </div>
@@ -436,7 +436,7 @@ export default function Analysis() {
                 <div className="relative">
                   <button
                     type="button"
-                    className="w-5 h-5 rounded-full bg-gray-200 hover:bg-white border border-gray-300 hover:border-gray-400 text-gray-700 hover:text-gray-900 transition-colors duration-200 flex items-center justify-center text-xs font-bold"
+                    className="w-5 h-5 rounded-full bg-gray-200 hover:bg-white border border-gray-300 hover:border-gray-400 text-gray-700 hover:text-gray-900 transition-colors duration-200 flex items-center justify-center text-xs font-bold cursor-pointer"
                     onMouseEnter={() => setShowWordCountTooltip(true)}
                     onMouseLeave={() => setShowWordCountTooltip(false)}
                     onFocus={() => setShowWordCountTooltip(true)}
@@ -495,7 +495,7 @@ export default function Analysis() {
                 <div className="relative">
                   <button
                     type="button"
-                    className="w-5 h-5 rounded-full bg-gray-200 hover:bg-white border border-gray-300 hover:border-gray-400 text-gray-700 hover:text-gray-900 transition-colors duration-200 flex items-center justify-center text-xs font-bold"
+                    className="w-5 h-5 rounded-full bg-gray-200 hover:bg-white border border-gray-300 hover:border-gray-400 text-gray-700 hover:text-gray-900 transition-colors duration-200 flex items-center justify-center text-xs font-bold cursor-pointer"
                     onMouseEnter={() => setShowChecksumTooltip(true)}
                     onMouseLeave={() => setShowChecksumTooltip(false)}
                     onFocus={() => setShowChecksumTooltip(true)}
@@ -554,7 +554,7 @@ export default function Analysis() {
                 <div className="relative">
                   <button
                     type="button"
-                    className="w-5 h-5 rounded-full bg-gray-200 hover:bg-white border border-gray-300 hover:border-gray-400 text-gray-700 hover:text-gray-900 transition-colors duration-200 flex items-center justify-center text-xs font-bold"
+                    className="w-5 h-5 rounded-full bg-gray-200 hover:bg-white border border-gray-300 hover:border-gray-400 text-gray-700 hover:text-gray-900 transition-colors duration-200 flex items-center justify-center text-xs font-bold cursor-pointer"
                     onMouseEnter={() => setShowComplexityTooltip(true)}
                     onMouseLeave={() => setShowComplexityTooltip(false)}
                     onFocus={() => setShowComplexityTooltip(true)}
@@ -701,7 +701,7 @@ export default function Analysis() {
                   <div className="relative">
                     <button
                       type="button"
-                      className="w-5 h-5 rounded-full bg-gray-200 hover:bg-white border border-gray-300 hover:border-gray-400 text-gray-700 hover:text-gray-900 transition-colors duration-200 flex items-center justify-center text-xs font-bold"
+                      className="w-5 h-5 rounded-full bg-gray-200 hover:bg-white border border-gray-300 hover:border-gray-400 text-gray-700 hover:text-gray-900 transition-colors duration-200 flex items-center justify-center text-xs font-bold cursor-pointer"
                       onMouseEnter={() => setShowCrossCuttingTooltip(true)}
                       onMouseLeave={() => setShowCrossCuttingTooltip(false)}
                       onFocus={() => setShowCrossCuttingTooltip(true)}
@@ -821,7 +821,7 @@ export default function Analysis() {
                                 toggleSharedSection(index);
                               }
                             }}
-                            className="flex items-center justify-between w-full text-left text-sm font-semibold text-card-foreground hover:text-primary transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded-md px-2 py-1"
+                            className="flex items-center justify-between w-full text-left text-sm font-semibold text-card-foreground hover:text-primary transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded-md px-2 py-1 cursor-pointer"
                             aria-expanded={expandedSharedSections.has(index)}
                             aria-controls={`shared-agencies-${index}`}
                             id={`shared-toggle-${index}`}
@@ -858,7 +858,7 @@ export default function Analysis() {
                                 <li key={agency.id}>
                                   <button
                                     onClick={() => handleSharedAgencySelect(agency.id)}
-                                    className="w-full text-left text-white hover:text-gray-200 hover:bg-gray-600 transition-colors duration-200 px-3 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-gray-800"
+                                    className="w-full text-left text-white hover:text-gray-200 hover:bg-gray-600 transition-colors duration-200 px-3 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-gray-800 cursor-pointer"
                                     aria-label={`Switch to ${agency.name} for analysis`}
                                   >
                                     <span className="font-medium">{agency.name}</span>
