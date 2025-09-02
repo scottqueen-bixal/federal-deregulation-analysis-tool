@@ -231,14 +231,14 @@ export default function AgencyCombobox({
           }`}
         />
       </button>
-      
+
       <div id="agency-combobox-description" className="sr-only">
         Use arrow keys to navigate options, Enter to select, Escape to close
       </div>
 
       {/* Dropdown */}
       {isOpen && (
-        <div 
+        <div
           className="absolute z-50 w-full mt-2 bg-white dark:bg-gray-800 border border-border rounded-md shadow-lg max-h-96 overflow-hidden"
           role="listbox"
           aria-labelledby="agency-combobox"

@@ -627,7 +627,7 @@ export default function Analysis() {
                     i
                   </button>
                   {showWordCountTooltip && (
-                    <div 
+                    <div
                       id="word-count-tooltip"
                       role="tooltip"
                       className="absolute z-50 w-80 p-4 bg-white border border-gray-300 rounded-lg shadow-lg -top-2 left-8 animate-fade-in"
@@ -704,7 +704,7 @@ export default function Analysis() {
                     i
                   </button>
                   {showChecksumTooltip && (
-                    <div 
+                    <div
                       id="checksum-tooltip"
                       role="tooltip"
                       className="absolute z-50 w-80 p-4 bg-white border border-gray-300 rounded-lg shadow-lg -top-2 left-8 animate-fade-in"
@@ -769,7 +769,7 @@ export default function Analysis() {
                     i
                   </button>
                   {showComplexityTooltip && (
-                    <div 
+                    <div
                       id="complexity-tooltip"
                       role="tooltip"
                       className="absolute z-50 w-80 p-4 bg-white border border-gray-300 rounded-lg shadow-lg -top-2 left-8 animate-fade-in"
@@ -902,7 +902,7 @@ export default function Analysis() {
                       i
                     </button>
                     {showCrossCuttingTooltip && (
-                      <div 
+                      <div
                         id="crosscutting-tooltip"
                         role="tooltip"
                         className="absolute z-50 w-80 p-4 bg-white border border-gray-300 rounded-lg shadow-lg -top-2 left-8 animate-fade-in"
