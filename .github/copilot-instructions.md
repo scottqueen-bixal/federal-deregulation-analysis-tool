@@ -79,7 +79,7 @@ Environment Variables: Is my DATABASE_URL stored securely in an .env file? Confi
 
 Schema Management: Is the schema.prisma file well-organized and are migrations being handled correctly with prisma migrate?
 
-### Tailwind css
+<!-- ### Tailwind css
 
 You are an expert front-end developer and UI engineer with a deep understanding of Tailwind CSS best practices for creating scalable and consistent design systems. Your task is to perform a thorough review of my project, focusing on how I use Tailwind CSS.
 
@@ -118,4 +118,4 @@ Use of Arbitrary Values: Am I using arbitrary values (e.g., mt-[13px], text-[#AB
 Class Name Consistency: Are developers on the team using the established design system, or are they falling back on default Tailwind values that were not intentionally included in the project's theme?
 
 ## 3. Component Abstraction
-Component-Based Styling: While not explicitly in the video, check if I am creating reusable React components for common UI elements (like buttons, cards, inputs) instead of repeating long strings of Tailwind classes. This enforces consistency at the component level.
+Component-Based Styling: While not explicitly in the video, check if I am creating reusable React components for common UI elements (like buttons, cards, inputs) instead of repeating long strings of Tailwind classes. This enforces consistency at the component level. -->

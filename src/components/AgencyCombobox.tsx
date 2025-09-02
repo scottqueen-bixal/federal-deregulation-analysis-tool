@@ -39,6 +39,12 @@ const MagnifyingGlassIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+const CheckIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+  </svg>
+);
+
 interface Agency {
   id: number;
   name: string;
@@ -74,6 +80,7 @@ export default React.memo(function AgencyCombobox({
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const optionsListRef = useRef<HTMLDivElement>(null);
 
   // Memoize grouped agencies to prevent expensive recalculation
   const groupedAgencies = useMemo(() => {
@@ -211,6 +218,32 @@ export default React.memo(function AgencyCombobox({
     }
   }, [isOpen]);
 
+  // Scroll to selected agency when dropdown opens
+  useEffect(() => {
+    if (isOpen && selectedAgency && optionsListRef.current) {
+      // Small delay to ensure the dropdown is fully rendered
+      const timer = setTimeout(() => {
+        const selectedButton = optionsListRef.current?.querySelector('[aria-selected="true"]') as HTMLElement;
+        if (selectedButton && optionsListRef.current) {
+          const container = optionsListRef.current;
+          const containerHeight = container.clientHeight;
+          const buttonTop = selectedButton.offsetTop;
+          const buttonHeight = selectedButton.offsetHeight;
+
+          // Calculate scroll position to center the selected item
+          const scrollTop = buttonTop - (containerHeight / 2) + (buttonHeight / 2);
+
+          container.scrollTo({
+            top: Math.max(0, scrollTop),
+            behavior: 'smooth'
+          });
+        }
+      }, 50);
+
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, selectedAgency, filteredGroups]);
+
   return (
     <div className="relative" ref={dropdownRef}>
       <label htmlFor="agency-combobox" className="block text-sm font-semibold mb-3 text-card-foreground">
@@ -223,12 +256,19 @@ export default React.memo(function AgencyCombobox({
         type="button"
         onClick={handleToggle}
         disabled={disabled || loading}
-        className="w-full p-4 bg-input border border-border rounded-md text-foreground focus:outline-none focus:ring-[3px] focus:ring-ring focus:border-transparent transition-all duration-200 font-medium flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+        className={`w-full p-4 border rounded-md focus:outline-none focus:ring-[3px] focus:ring-ring focus:border-transparent transition-all duration-200 font-medium flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${
+          selectedAgency
+            ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700 text-blue-900 dark:text-blue-100'
+            : 'bg-input border-border text-foreground'
+        }`}
         aria-expanded={isOpen}
         aria-haspopup="listbox"
         aria-describedby="agency-combobox-description"
       >
-        <span className="truncate">
+        <span className="truncate flex items-center">
+          {selectedAgency && (
+            <CheckIcon className="h-4 w-4 mr-2 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+          )}
           {loading
             ? <LoadingText text="Loading agencies..." size="sm" />
             : selectedAgencyName
@@ -237,7 +277,11 @@ export default React.memo(function AgencyCombobox({
           }
         </span>
         <ChevronDownIcon
-          className={`h-5 w-5 text-muted-foreground transition-transform duration-200 ${
+          className={`h-5 w-5 transition-transform duration-200 flex-shrink-0 ${
+            selectedAgency
+              ? 'text-blue-600 dark:text-blue-400'
+              : 'text-muted-foreground'
+          } ${
             isOpen ? 'rotate-180' : ''
           }`}
         />
@@ -275,7 +319,7 @@ export default React.memo(function AgencyCombobox({
           </div>
 
           {/* Options List */}
-          <div className="max-h-80 overflow-y-auto bg-white dark:bg-gray-800">
+          <div ref={optionsListRef} className="max-h-80 overflow-y-auto bg-white dark:bg-gray-800">
             {filteredGroups.length === 0 ? (
               <div className="p-4 text-sm text-muted-foreground text-center bg-white dark:bg-gray-800">
                 No agencies found matching &ldquo;{searchTerm}&rdquo;
@@ -300,22 +344,31 @@ export default React.memo(function AgencyCombobox({
                         key={agency.id}
                         type="button"
                         onClick={() => handleAgencySelect(agency)}
-                        className={`w-full text-left px-4 py-2 text-sm transition-colors duration-150 bg-white dark:bg-gray-800 cursor-pointer ${
+                        className={`w-full text-left px-4 py-2 text-sm transition-colors duration-150 bg-white dark:bg-gray-800 cursor-pointer flex items-center ${
                           isChild ? 'pl-8' : ''
                         } ${
-                          isHighlighted
-                            ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-900 dark:text-blue-100'
-                            : 'hover:bg-gray-50 dark:hover:bg-gray-700'
-                        } ${
                           isSelected
-                            ? 'bg-blue-100 dark:bg-blue-800 text-blue-900 dark:text-blue-100 font-medium'
-                            : 'text-gray-900 dark:text-gray-100'
+                            ? 'text-white font-semibold border-l-4'
+                            : isHighlighted
+                            ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-900 dark:text-blue-100'
+                            : 'hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100'
                         }`}
+                        style={isSelected ? {
+                          backgroundColor: 'hsl(var(--ring))',
+                          borderLeftColor: 'hsl(var(--ring))'
+                        } : {}}
                         role="option"
                         aria-selected={isSelected}
                       >
-                        {isChild && <span className="text-muted-foreground mr-2">└─</span>}
-                        {agency.name}
+                        <div className="flex items-center w-full">
+                          <div className="flex items-center flex-1">
+                            {isChild && <span className={`mr-2 ${isSelected ? 'text-white/80' : 'text-muted-foreground'}`}>└─</span>}
+                            <span>{agency.name}</span>
+                          </div>
+                          {isSelected && (
+                            <CheckIcon className="h-5 w-5 text-white ml-2 flex-shrink-0 font-bold" />
+                          )}
+                        </div>
                       </button>
                     );
                   })}
