@@ -212,7 +212,7 @@ export default function AgencyCombobox({
         type="button"
         onClick={handleToggle}
         disabled={disabled || loading}
-        className="w-full p-4 bg-input border border-border rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all duration-200 font-medium flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+        className="w-full p-4 bg-input border border-border rounded-md text-foreground focus:outline-none focus:ring-[3px] focus:ring-ring focus:border-transparent transition-all duration-200 font-medium flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
         aria-expanded={isOpen}
         aria-haspopup="listbox"
       >
@@ -247,7 +247,7 @@ export default function AgencyCombobox({
                   setHighlightedIndex(-1);
                 }}
                 placeholder="Search agencies..."
-                className="w-full pl-10 pr-4 py-2 bg-white dark:bg-gray-700 border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring text-foreground"
+                className="w-full pl-10 pr-4 py-2 bg-white dark:bg-gray-700 border border-input rounded-md text-sm focus:outline-none focus:ring-[3px] focus:ring-ring text-foreground"
               />
             </div>
           </div>

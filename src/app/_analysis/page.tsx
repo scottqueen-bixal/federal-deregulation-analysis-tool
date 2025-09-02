@@ -821,7 +821,7 @@ export default function Analysis() {
                                 toggleSharedSection(index);
                               }
                             }}
-                            className="flex items-center justify-between w-full text-left text-sm font-semibold text-card-foreground hover:text-primary transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded-md px-2 py-1 cursor-pointer"
+                            className="flex items-center justify-between w-full text-left text-sm font-semibold text-card-foreground hover:text-primary transition-colors duration-200 focus:outline-none focus:ring-[3px] focus:ring-ring focus:ring-offset-2 rounded-md px-2 py-1 cursor-pointer"
                             aria-expanded={expandedSharedSections.has(index)}
                             aria-controls={`shared-agencies-${index}`}
                             id={`shared-toggle-${index}`}
@@ -858,7 +858,7 @@ export default function Analysis() {
                                 <li key={agency.id}>
                                   <button
                                     onClick={() => handleSharedAgencySelect(agency.id)}
-                                    className="w-full text-left text-white hover:text-gray-200 hover:bg-gray-600 transition-colors duration-200 px-3 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-gray-800 cursor-pointer"
+                                    className="w-full text-left text-white hover:text-gray-200 hover:bg-gray-600 transition-colors duration-200 px-3 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-[3px] focus:ring-[#0080ff] focus:ring-offset-2 focus:ring-offset-gray-800 cursor-pointer"
                                     aria-label={`Switch to ${agency.name} for analysis`}
                                   >
                                     <span className="font-medium">{agency.name}</span>

@@ -23,7 +23,7 @@
   --destructive-foreground: 210 40% 98%;        /* White text on red */
   --border: 214 32% 91%;                        /* Light blue-gray borders */
   --input: 210 40% 96%;                         /* Light gray input backgrounds */
-  --ring: 222 47% 11%;                          /* Navy blue focus rings */
+  --ring: 210 100% 50%;                         /* Blue focus rings #0080ff */
   --radius: 0.3rem;                             /* Subtle border radius */
 
   /* Chart colors - Professional palette */
@@ -59,7 +59,7 @@
   --destructive-foreground: 210 40% 98%;        /* White text on red */
   --border: 217 32.6% 17.5%;                    /* Dark borders */
   --input: 217 32.6% 17.5%;                     /* Dark input backgrounds */
-  --ring: 212.7 26.8% 83.9%;                    /* Light ring in dark mode */
+  --ring: 210 100% 50%;                          /* Blue focus rings #0080ff */
 }
 
 * {
@@ -89,7 +89,7 @@ body {
 
 /* Enhanced focus styles for accessibility */
 *:focus-visible {
-  outline: 2px solid hsl(var(--ring));
+  outline: 3px solid hsl(var(--ring));
   outline-offset: 2px;
 }
 
