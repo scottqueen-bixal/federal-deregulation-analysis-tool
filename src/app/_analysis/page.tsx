@@ -200,6 +200,19 @@ export default function Analysis() {
       if (endpoint === 'complexity_score' && data.complexity_score !== undefined) {
         data.complexityScore = Math.round(data.complexity_score);
         data.relativeComplexityScore = Math.round(data.relative_complexity_score || 0);
+
+        // Ensure metrics structure exists for individual agencies
+        if (data.calculation_details?.total_sections) {
+          // Get current word count from state or data
+          const currentWordCount = data.wordCount || analysisData.wordCount || 0;
+          data.metrics = {
+            totalSections: data.calculation_details.total_sections,
+            totalWords: currentWordCount,
+            avgWordsPerSection: data.calculation_details.total_sections > 0 && currentWordCount > 0 ?
+              Math.round(currentWordCount / data.calculation_details.total_sections) : 0,
+            hierarchyDepth: data.hierarchy_depth || 3
+          };
+        }
       }
 
       setAnalysisData(prev => ({ ...prev, ...data }));
@@ -295,7 +308,18 @@ export default function Analysis() {
 
       if (endpoint === 'word_count') {
         const totalWordCount = validResults.reduce((sum, result) => sum + (result.wordCount || 0), 0);
-        aggregatedResult = { wordCount: totalWordCount };
+        const totalSections = validResults.reduce((sum, result) =>
+          sum + (result.calculation_details?.total_sections || 0), 0);
+
+        aggregatedResult = {
+          wordCount: totalWordCount,
+          metrics: {
+            totalSections: totalSections,
+            totalWords: totalWordCount,
+            avgWordsPerSection: Math.round(totalSections > 0 && totalWordCount > 0 ?
+              totalWordCount / totalSections : 0)
+          }
+        };
         setAggregatedData(prev => ({ ...prev, ...aggregatedResult }));
         return totalWordCount; // Return word count for use in complexity calculation
       } else if (endpoint === 'complexity_score') {
@@ -545,18 +569,30 @@ export default function Analysis() {
               loadingText="Loading..."
               valueColor="text-chart-1"
               ariaLabel={`Total word count: ${getDisplayData().wordCount?.toLocaleString() || 'Not available'}`}
-              additionalContent={getDisplayData().metrics && !complexityScoreLoading ? (
+              additionalContent={(
                 <dl className="space-y-2 text-sm text-muted-foreground">
                   <div className="flex justify-between py-1 border-b border-border/30">
                     <dt className="font-medium">Sections:</dt>
-                    <dd className="text-card-foreground">{getDisplayData().metrics?.totalSections}</dd>
+                    <dd className="text-card-foreground">
+                      {wordCountLoading || complexityScoreLoading ? (
+                        <span className="text-gray-400">Loading...</span>
+                      ) : (
+                        getDisplayData().metrics?.totalSections || 'N/A'
+                      )}
+                    </dd>
                   </div>
                   <div className="flex justify-between py-1 border-b border-border/30">
                     <dt className="font-medium">Avg Words/Section:</dt>
-                    <dd className="text-card-foreground">{getDisplayData().metrics?.avgWordsPerSection?.toFixed(1)}</dd>
+                    <dd className="text-card-foreground">
+                      {wordCountLoading || complexityScoreLoading ? (
+                        <span className="text-gray-400">Loading...</span>
+                      ) : (
+                        getDisplayData().metrics?.avgWordsPerSection?.toFixed(1) || 'N/A'
+                      )}
+                    </dd>
                   </div>
                 </dl>
-              ) : undefined}
+              )}
             />
 
             <MetricCard
