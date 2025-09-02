@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo, useCallback, Suspense, lazy } from 'react
 import AgencySelector from '../../components/AgencySelector';
 import MetricCard from '../../components/MetricCard';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import ErrorBoundary from '../../components/ErrorBoundary';
 import {
   WordCountTooltipContent,
   ChecksumTooltipContent,
@@ -494,7 +495,26 @@ export default function AnalysisClientWrapper({
         <h2 id="metrics-heading" className="font-heading text-3xl font-semibold mb-8 text-foreground">
           Key Analysis Metrics
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8" role="region" aria-label="Key analysis metrics">
+        <ErrorBoundary
+          fallback={
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="bg-card border border-border rounded-lg p-6">
+                  <div className="text-center py-8">
+                    <p className="text-destructive mb-2">Failed to load metric</p>
+                    <button
+                      onClick={() => window.location.reload()}
+                      className="text-sm text-primary hover:underline"
+                    >
+                      Reload to try again
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          }
+        >
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8" role="region" aria-label="Key analysis metrics">
           <MetricCard
             title="Word Count"
             value={getDisplayData().wordCount?.toLocaleString() || 'N/A'}
@@ -580,7 +600,8 @@ export default function AnalysisClientWrapper({
             }
             ariaLabel={`Complexity score: ${getDisplayData().relativeComplexityScore || 'Not available'} out of 100`}
           />
-        </div>
+          </div>
+        </ErrorBoundary>
       </section>
 
       {/* Cross-Cutting Analysis Section */}

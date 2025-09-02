@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import AnalysisHeader from '../components/AnalysisHeader';
 import AnalysisClientWrapper from './_analysis/AnalysisClientWrapper';
 import LoadingSpinner from '../components/LoadingSpinner';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 interface Agency {
   id: number;
@@ -91,7 +92,12 @@ export default async function Home() {
               </section>
             </div>
           }>
-            <AnalysisClientWrapper initialAgencies={agencies} />
+            <ErrorBoundary
+              showDetails={process.env.NODE_ENV === 'development'}
+              resetOnPropsChange={true}
+            >
+              <AnalysisClientWrapper initialAgencies={agencies} />
+            </ErrorBoundary>
           </Suspense>
         </main>
       </div>
