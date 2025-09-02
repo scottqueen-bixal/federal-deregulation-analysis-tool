@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, ReactNode } from 'react';
+import React, { useState, ReactNode } from 'react';
 import Tooltip from './Tooltip';
+import { LoadingMetric } from './LoadingSpinner';
 
 interface MetricCardProps {
   title: string;
@@ -55,10 +56,7 @@ export default function MetricCard({
 
       <div className="flex items-center gap-4">
         {loading ? (
-          <div className="flex items-center gap-2">
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-chart-1"></div>
-            <p className="text-4xl font-bold text-muted-foreground">{loadingText}</p>
-          </div>
+          <LoadingMetric text={loadingText} />
         ) : (
           <div className={`text-4xl font-bold mb-2 ${valueColor}`} aria-label={ariaLabel}>
             {value}

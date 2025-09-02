@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { LoadingText } from './LoadingSpinner';
 
 interface Agency {
   id: number;
@@ -219,7 +220,7 @@ export default function AgencyCombobox({
       >
         <span className="truncate">
           {loading
-            ? 'Loading agencies...'
+            ? <LoadingText text="Loading agencies..." size="sm" />
             : selectedAgencyName
               ? selectedAgencyName
               : 'Choose an agency...'

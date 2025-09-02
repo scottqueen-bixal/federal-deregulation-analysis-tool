@@ -4,6 +4,7 @@ import { useState } from 'react';
 import MetricCard from './MetricCard';
 import CFRTitlesList from './CFRTitlesList';
 import Tooltip from './Tooltip';
+import { LoadingCard } from './LoadingSpinner';
 import {
   SharedTitlesTooltipContent,
   PartnerAgenciesTooltipContent,
@@ -80,14 +81,7 @@ export default function CrossCuttingAnalysis({
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
           {[1, 2, 3].map((i) => (
-            <article key={i} className="bg-card border border-border rounded-lg p-8 shadow-sm">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-chart-3"></div>
-                <h3 className="text-xl font-semibold text-muted-foreground font-heading">Loading...</h3>
-              </div>
-              <div className="h-12 bg-muted rounded animate-pulse mb-2"></div>
-              <div className="h-4 bg-muted rounded animate-pulse w-3/4"></div>
-            </article>
+            <LoadingCard key={i} title="Loading..." />
           ))}
         </div>
       ) : (
