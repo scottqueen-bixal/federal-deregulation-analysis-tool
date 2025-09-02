@@ -1026,10 +1026,10 @@ export default function Analysis() {
                               aria-label={`${title.sharedWith.length} agencies sharing this CFR title`}
                             >
                               {title.sharedWith.map((agency) => (
-                                <li key={agency.id}>
+                                <li key={agency.id} className="flex">
                                   <button
                                     onClick={() => handleSharedAgencySelect(agency.id)}
-                                    className="w-full text-left text-white hover:text-gray-200 hover:bg-gray-600 transition-colors duration-200 px-3 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-[3px] focus:ring-[#0080ff] focus:ring-offset-2 focus:ring-offset-gray-800 cursor-pointer"
+                                    className="w-full h-full text-left text-white hover:text-gray-200 hover:bg-gray-600 transition-colors duration-200 px-3 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-[3px] focus:ring-[#0080ff] focus:ring-offset-2 focus:ring-offset-gray-800 cursor-pointer flex items-center"
                                     aria-label={`Switch to ${agency.name} for analysis`}
                                   >
                                     <span className="font-medium">{agency.name}</span>
