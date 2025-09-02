@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 
 interface CFRTitle {
   cfrNumber: number;
@@ -18,11 +18,11 @@ interface CFRTitlesListProps {
   onAgencySelect: (agencyId: number) => void;
 }
 
-export default function CFRTitlesList({ titles, agencyName, onAgencySelect }: CFRTitlesListProps) {
+export default React.memo(function CFRTitlesList({ titles, agencyName, onAgencySelect }: CFRTitlesListProps) {
   const [expandedSharedSections, setExpandedSharedSections] = useState<Set<number>>(new Set());
 
-  // Function to toggle accordion sections
-  const toggleSharedSection = (titleIndex: number) => {
+  // Function to toggle accordion sections - memoized to prevent unnecessary re-renders
+  const toggleSharedSection = useCallback((titleIndex: number) => {
     setExpandedSharedSections(prev => {
       const newSet = new Set(prev);
       if (newSet.has(titleIndex)) {
@@ -32,7 +32,7 @@ export default function CFRTitlesList({ titles, agencyName, onAgencySelect }: CF
       }
       return newSet;
     });
-  };
+  }, []);
 
   if (!titles || titles.length === 0) {
     return null;
@@ -142,4 +142,4 @@ export default function CFRTitlesList({ titles, agencyName, onAgencySelect }: CF
       </ul>
     </section>
   );
-}
+});

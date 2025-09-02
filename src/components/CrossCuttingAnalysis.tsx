@@ -4,7 +4,7 @@ import { useState } from 'react';
 import MetricCard from './MetricCard';
 import CFRTitlesList from './CFRTitlesList';
 import Tooltip from './Tooltip';
-import { LoadingCard } from './LoadingSpinner';
+import { LoadingCard } from './LoadingSpinner/LoadingSpinner';
 import {
   SharedTitlesTooltipContent,
   PartnerAgenciesTooltipContent,

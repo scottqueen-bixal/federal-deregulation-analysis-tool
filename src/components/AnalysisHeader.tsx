@@ -1,6 +1,8 @@
 'use client';
 
-export default function AnalysisHeader() {
+import React from 'react';
+
+export default React.memo(function AnalysisHeader() {
   return (
     <header className="mb-12">
       <h1 className="pt-8 font-display text-5xl font-bold mb-4 text-foreground tracking-tight">
@@ -25,4 +27,4 @@ export default function AnalysisHeader() {
       </div>
     </header>
   );
-}
+});

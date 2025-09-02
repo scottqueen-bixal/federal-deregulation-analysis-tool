@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import AnalysisHeader from '../components/AnalysisHeader';
 import AnalysisClientWrapper from './_analysis/AnalysisClientWrapper';
-import LoadingSpinner from '../components/LoadingSpinner';
+import LoadingSpinner from '../components/LoadingSpinner/LoadingSpinner';
 import ErrorBoundary from '../components/ErrorBoundary';
 
 interface Agency {

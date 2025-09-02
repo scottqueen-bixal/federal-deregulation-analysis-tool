@@ -30,7 +30,11 @@ export default function Error({ error, reset }: ErrorPageProps) {
                       Try Again
                     </button>
                     <button
-                      onClick={() => window.location.href = '/'}
+                      onClick={() => {
+                        if (typeof window !== 'undefined') {
+                          window.location.href = '/';
+                        }
+                      }}
                       className="w-full px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors"
                     >
                       Go Home

@@ -1,5 +1,6 @@
 'use client';
 
+import React, { useMemo, useCallback } from 'react';
 import AgencyCombobox from './AgencyCombobox';
 
 interface Agency {
@@ -28,7 +29,7 @@ interface AgencySelectorProps {
   onAggregationToggle: (checked: boolean) => void;
 }
 
-export default function AgencySelector({
+export default React.memo(function AgencySelector({
   agencies,
   selectedAgency,
   agenciesLoading,
@@ -36,16 +37,16 @@ export default function AgencySelector({
   onAgencyChange,
   onAggregationToggle
 }: AgencySelectorProps) {
-  // Helper function to get selected agency details
-  const getSelectedAgencyDetails = () => {
+  // Helper function to get selected agency details - memoized
+  const getSelectedAgencyDetails = useCallback(() => {
     return agencies.find(agency => agency.id === selectedAgency);
-  };
+  }, [agencies, selectedAgency]);
 
-  // Helper function to check if selected agency has children
-  const selectedAgencyHasChildren = () => {
+  // Helper function to check if selected agency has children - memoized
+  const selectedAgencyHasChildren = useMemo(() => {
     const agency = getSelectedAgencyDetails();
     return agency?.children && agency.children.length > 0;
-  };
+  }, [getSelectedAgencyDetails]);
 
   return (
     <section aria-labelledby="agency-selection-heading" className="mb-12">
@@ -66,7 +67,7 @@ export default function AgencySelector({
           </div>
 
           {/* Aggregation Toggle - only show if selected agency has children */}
-          {selectedAgency && selectedAgencyHasChildren() && (
+          {selectedAgency && selectedAgencyHasChildren && (
             <div className="mt-6 p-4 bg-muted/50 border border-border rounded-lg">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
@@ -104,4 +105,4 @@ export default function AgencySelector({
       </div>
     </section>
   );
-}
+});

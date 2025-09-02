@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { LoadingText } from './LoadingSpinner';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { LoadingText } from './LoadingSpinner/LoadingSpinner';
 
 interface Agency {
   id: number;
@@ -62,7 +62,7 @@ interface AgencyComboboxProps {
   disabled?: boolean;
 }
 
-export default function AgencyCombobox({
+export default React.memo(function AgencyCombobox({
   agencies,
   selectedAgency,
   onAgencyChange,
@@ -72,11 +72,11 @@ export default function AgencyCombobox({
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
-  const searchInputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Group agencies by parent/independent
-  const groupedAgencies: AgencyGroup[] = (() => {
+  // Memoize grouped agencies to prevent expensive recalculation
+  const groupedAgencies = useMemo(() => {
     if (!Array.isArray(agencies)) return [];
 
     const parentAgencies = agencies.filter(agency => !agency.parentId);
@@ -112,26 +112,47 @@ export default function AgencyCombobox({
     }
 
     return groups;
-  })();
+  }, [agencies]);
 
   // Filter agencies based on search term
-  const filteredGroups = groupedAgencies.map(group => ({
-    ...group,
-    agencies: group.agencies.filter(agency =>
-      agency.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      agency.slug.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  })).filter(group => group.agencies.length > 0);
+  const filteredGroups = useMemo(() =>
+    groupedAgencies.map(group => ({
+      ...group,
+      agencies: group.agencies.filter(agency =>
+        agency.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        agency.slug.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    })).filter(group => group.agencies.length > 0),
+    [groupedAgencies, searchTerm]
+  );
 
   // Get all filtered agencies for keyboard navigation
-  const allFilteredAgencies = filteredGroups.flatMap(group => group.agencies);
+  const allFilteredAgencies = useMemo(() =>
+    filteredGroups.flatMap(group => group.agencies),
+    [filteredGroups]
+  );
 
   // Get selected agency name
-  const selectedAgencyName = selectedAgency
-    ? agencies.find(a => a.id === selectedAgency)?.name
-    : null;
+  const selectedAgencyName = useMemo(() =>
+    selectedAgency ? agencies.find(a => a.id === selectedAgency)?.name : null,
+    [selectedAgency, agencies]
+  );
 
-  // Handle keyboard navigation
+  // Memoized event handlers
+  const handleToggle = useCallback(() => {
+    if (disabled || loading) return;
+    setIsOpen(!isOpen);
+    setHighlightedIndex(-1);
+  }, [disabled, loading, isOpen]);
+
+  const handleAgencySelect = useCallback((agency: Agency) => {
+    onAgencyChange(agency.id);
+    setIsOpen(false);
+    setSearchTerm('');
+    setHighlightedIndex(-1);
+  }, [onAgencyChange]);
+
+  // Handle keyboard navigation with proper dependencies
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isOpen) return;
@@ -152,9 +173,7 @@ export default function AgencyCombobox({
         case 'Enter':
           e.preventDefault();
           if (highlightedIndex >= 0 && allFilteredAgencies[highlightedIndex]) {
-            onAgencyChange(allFilteredAgencies[highlightedIndex].id);
-            setIsOpen(false);
-            setSearchTerm('');
+            handleAgencySelect(allFilteredAgencies[highlightedIndex]);
           }
           break;
         case 'Escape':
@@ -164,9 +183,11 @@ export default function AgencyCombobox({
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, highlightedIndex, allFilteredAgencies, onAgencyChange]);
+    if (typeof document !== 'undefined') {
+      document.addEventListener('keydown', handleKeyDown);
+      return () => document.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isOpen, highlightedIndex, allFilteredAgencies, handleAgencySelect]);
 
   // Handle clicks outside
   useEffect(() => {
@@ -177,8 +198,10 @@ export default function AgencyCombobox({
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    if (typeof document !== 'undefined') {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
   }, []);
 
   // Focus search input when opened
@@ -187,19 +210,6 @@ export default function AgencyCombobox({
       searchInputRef.current.focus();
     }
   }, [isOpen]);
-
-  const handleToggle = () => {
-    if (disabled || loading) return;
-    setIsOpen(!isOpen);
-    setHighlightedIndex(-1);
-  };
-
-  const handleAgencySelect = (agency: Agency) => {
-    onAgencyChange(agency.id);
-    setIsOpen(false);
-    setSearchTerm('');
-    setHighlightedIndex(-1);
-  };
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -317,4 +327,4 @@ export default function AgencyCombobox({
       )}
     </div>
   );
-}
+});

@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode } from 'react';
+import React, { ReactNode } from 'react';
 
 interface TooltipProps {
   children: ReactNode;
@@ -9,7 +9,7 @@ interface TooltipProps {
   className?: string;
 }
 
-export default function Tooltip({ children, show, id, className = '' }: TooltipProps) {
+export default React.memo(function Tooltip({ children, show, id, className = '' }: TooltipProps) {
   if (!show) return null;
 
   return (
@@ -26,4 +26,4 @@ export default function Tooltip({ children, show, id, className = '' }: TooltipP
       <div className="absolute top-3 -left-1 w-0 h-0 border-t-8 border-b-8 border-r-8 border-transparent border-r-white"></div>
     </div>
   );
-}
+});

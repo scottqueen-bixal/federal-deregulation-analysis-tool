@@ -4,7 +4,7 @@
 import { useMemo, useCallback, useReducer, Suspense, lazy } from 'react';
 import AgencySelector from '../../components/AgencySelector';
 import MetricCard from '../../components/MetricCard';
-import LoadingSpinner from '../../components/LoadingSpinner';
+import LoadingSpinner from '../../components/LoadingSpinner/LoadingSpinner';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import {
   WordCountTooltipContent,
@@ -584,7 +584,11 @@ export default function AnalysisClientWrapper({
                   <div className="text-center py-8">
                     <p className="text-destructive mb-2">Failed to load metric</p>
                     <button
-                      onClick={() => window.location.reload()}
+                      onClick={() => {
+                        if (typeof window !== 'undefined') {
+                          window.location.reload();
+                        }
+                      }}
                       className="text-sm text-primary hover:underline"
                     >
                       Reload to try again

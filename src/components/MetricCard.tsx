@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, ReactNode } from 'react';
+import React, { useState, ReactNode, useMemo } from 'react';
 import Tooltip from './Tooltip';
-import { LoadingMetric } from './LoadingSpinner';
+import { LoadingMetric } from './LoadingSpinner/LoadingSpinner';
 
 interface MetricCardProps {
   title: string;
@@ -16,7 +16,7 @@ interface MetricCardProps {
   ariaLabel?: string;
 }
 
-export default function MetricCard({
+export default React.memo(function MetricCard({
   title,
   value,
   description,
@@ -28,7 +28,12 @@ export default function MetricCard({
   ariaLabel
 }: MetricCardProps) {
   const [showTooltip, setShowTooltip] = useState(false);
-  const tooltipId = `${title.toLowerCase().replace(/\s+/g, '-')}-tooltip`;
+
+  // Memoize tooltip ID to prevent recalculation on every render
+  const tooltipId = useMemo(() =>
+    `${title.toLowerCase().replace(/\s+/g, '-')}-tooltip`,
+    [title]
+  );
 
   return (
     <article className="bg-card border border-border rounded-lg p-8 shadow-sm hover:shadow-md transition-shadow duration-200">
@@ -75,4 +80,4 @@ export default function MetricCard({
       )}
     </article>
   );
-}
+});
