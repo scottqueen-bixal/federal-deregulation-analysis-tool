@@ -115,18 +115,18 @@ export default function Analysis() {
     // Weighted final score (max ~30)
     const rawScore = (impactScore * 0.4) + (agencyBreadthScore * 0.3) + (densityScore * 0.2) + (highImpactBonus * 0.1);
 
-    // Normalize to 0-100 scale
-    const normalizedScore = Math.min((rawScore / 30) * 100, 100);
+    // Keep raw score instead of normalizing to 100
+    const finalScore = Math.min(rawScore, 30);
 
-    // Determine severity level
+    // Determine severity level based on new ranges
     let level: 'MINIMAL' | 'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL';
-    if (normalizedScore < 15) level = 'MINIMAL';
-    else if (normalizedScore < 35) level = 'LOW';
-    else if (normalizedScore < 60) level = 'MODERATE';
-    else if (normalizedScore < 80) level = 'HIGH';
+    if (finalScore < 2) level = 'MINIMAL';
+    else if (finalScore < 6) level = 'LOW';
+    else if (finalScore < 11) level = 'MODERATE';
+    else if (finalScore < 21) level = 'HIGH';
     else level = 'CRITICAL';
 
-    return { score: Math.round(normalizedScore), level };
+    return { score: Math.round(finalScore), level };
   };
 
   const crossCuttingSeverity = calculateCrossCuttingSeverity(crossCuttingData.summary, crossCuttingData.crossCuttingTitles);
@@ -706,11 +706,11 @@ export default function Analysis() {
                             <strong className="text-gray-900">Severity levels:</strong>
                           </p>
                           <ul className="list-disc list-inside mb-3 space-y-1 text-gray-700 ml-4">
-                            <li className="text-gray-600"><strong>MINIMAL (0-14):</strong> Limited cross-agency impact</li>
-                            <li className="text-green-600"><strong>LOW (15-34):</strong> Minor overlap concerns</li>
-                            <li className="text-yellow-600"><strong>MODERATE (35-59):</strong> Significant coordination needed</li>
-                            <li className="text-orange-600"><strong>HIGH (60-79):</strong> Complex inter-agency effects</li>
-                            <li className="text-red-600"><strong>CRITICAL (80+):</strong> Major bureaucratic entanglement</li>
+                            <li className="text-gray-600"><strong>MINIMAL (0-1):</strong> Limited cross-agency impact</li>
+                            <li className="text-green-600"><strong>LOW (2-5):</strong> Minor overlap concerns</li>
+                            <li className="text-yellow-600"><strong>MODERATE (6-10):</strong> Significant coordination needed</li>
+                            <li className="text-orange-600"><strong>HIGH (11-20):</strong> Complex inter-agency effects</li>
+                            <li className="text-red-600"><strong>CRITICAL (21+):</strong> Major bureaucratic entanglement</li>
                           </ul>
                           <p className="text-gray-700">
                             <strong className="text-gray-900">Why it matters:</strong> Higher scores indicate regulations requiring coordinated reform efforts and potential sources of bureaucratic inefficiency.
@@ -726,7 +726,7 @@ export default function Analysis() {
                 <p className={`text-4xl font-bold mb-2 ${
                   crossCuttingSeverity.level === 'MINIMAL' ? 'text-gray-500 dark:text-gray-400' :
                   crossCuttingSeverity.level === 'LOW' ? 'text-green-600 dark:text-green-400' :
-                  crossCuttingSeverity.level === 'MODERATE' ? 'text-yellow-600 dark:text-yellow-400' :
+                  crossCuttingSeverity.level === 'MODERATE' ? 'text-yellow-600' :
                   crossCuttingSeverity.level === 'HIGH' ? 'text-orange-600 dark:text-orange-400' :
                   'text-red-600 dark:text-red-400'
                 }`} aria-label={`Cross-cutting severity score: ${crossCuttingSeverity.score} out of 100, ${crossCuttingSeverity.level.toLowerCase()} impact`}>
