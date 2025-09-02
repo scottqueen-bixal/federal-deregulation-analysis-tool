@@ -621,11 +621,17 @@ export default function Analysis() {
                     onFocus={() => setShowWordCountTooltip(true)}
                     onBlur={() => setShowWordCountTooltip(false)}
                     aria-label="Word count information"
+                    aria-describedby={showWordCountTooltip ? "word-count-tooltip" : undefined}
+                    aria-expanded={showWordCountTooltip}
                   >
                     i
                   </button>
                   {showWordCountTooltip && (
-                    <div className="absolute z-50 w-80 p-4 bg-white border border-gray-300 rounded-lg shadow-lg -top-2 left-8 animate-fade-in">
+                    <div 
+                      id="word-count-tooltip"
+                      role="tooltip"
+                      className="absolute z-50 w-80 p-4 bg-white border border-gray-300 rounded-lg shadow-lg -top-2 left-8 animate-fade-in"
+                    >
                       <div className="text-sm text-gray-900">
                         <h4 className="font-semibold mb-2 text-gray-900">Word Count Calculation</h4>
                         <p className="mb-3 text-gray-800">
@@ -692,11 +698,17 @@ export default function Analysis() {
                     onFocus={() => setShowChecksumTooltip(true)}
                     onBlur={() => setShowChecksumTooltip(false)}
                     aria-label="Document checksum information"
+                    aria-describedby={showChecksumTooltip ? "checksum-tooltip" : undefined}
+                    aria-expanded={showChecksumTooltip}
                   >
                     i
                   </button>
                   {showChecksumTooltip && (
-                    <div className="absolute z-50 w-80 p-4 bg-white border border-gray-300 rounded-lg shadow-lg -top-2 left-8 animate-fade-in">
+                    <div 
+                      id="checksum-tooltip"
+                      role="tooltip"
+                      className="absolute z-50 w-80 p-4 bg-white border border-gray-300 rounded-lg shadow-lg -top-2 left-8 animate-fade-in"
+                    >
                       <div className="text-sm text-gray-900">
                         <h4 className="font-semibold mb-2 text-gray-900">Document Checksum</h4>
                         <p className="mb-3 text-gray-800">
@@ -751,11 +763,17 @@ export default function Analysis() {
                     onFocus={() => setShowComplexityTooltip(true)}
                     onBlur={() => setShowComplexityTooltip(false)}
                     aria-label="Complexity score information"
+                    aria-describedby={showComplexityTooltip ? "complexity-tooltip" : undefined}
+                    aria-expanded={showComplexityTooltip}
                   >
                     i
                   </button>
                   {showComplexityTooltip && (
-                    <div className="absolute z-50 w-80 p-4 bg-white border border-gray-300 rounded-lg shadow-lg -top-2 left-8 animate-fade-in">
+                    <div 
+                      id="complexity-tooltip"
+                      role="tooltip"
+                      className="absolute z-50 w-80 p-4 bg-white border border-gray-300 rounded-lg shadow-lg -top-2 left-8 animate-fade-in"
+                    >
                       <div className="text-sm text-gray-900">
                         <h4 className="font-semibold mb-2 text-gray-900">Relative Complexity Score</h4>
                         <p className="mb-3 text-gray-800">
@@ -801,9 +819,9 @@ export default function Analysis() {
                 ) : (
                   <p className={`text-4xl font-bold mb-2 ${
                     !getDisplayData().relativeComplexityScore ? 'text-muted-foreground' :
-                    (getDisplayData().relativeComplexityScore || 0) < 25 ? 'text-green-600 dark:text-green-400' :
-                    (getDisplayData().relativeComplexityScore || 0) <= 60 ? 'text-orange-600 dark:text-orange-400' :
-                    'text-red-600 dark:text-red-400'
+                    (getDisplayData().relativeComplexityScore || 0) < 25 ? 'text-green-700 dark:text-green-400' :
+                    (getDisplayData().relativeComplexityScore || 0) <= 60 ? 'text-orange-700 dark:text-orange-400' :
+                    'text-red-700 dark:text-red-400'
                   }`} aria-label={`Complexity score: ${getDisplayData().relativeComplexityScore || 'Not available'} out of 100`}>
                     {getDisplayData().relativeComplexityScore ? `${getDisplayData().relativeComplexityScore}/100` : 'N/A'}
                   </p>
@@ -878,11 +896,17 @@ export default function Analysis() {
                       onFocus={() => setShowCrossCuttingTooltip(true)}
                       onBlur={() => setShowCrossCuttingTooltip(false)}
                       aria-label="Cross-cutting impact information"
+                      aria-describedby={showCrossCuttingTooltip ? "crosscutting-tooltip" : undefined}
+                      aria-expanded={showCrossCuttingTooltip}
                     >
                       i
                     </button>
                     {showCrossCuttingTooltip && (
-                      <div className="absolute z-50 w-80 p-4 bg-white border border-gray-300 rounded-lg shadow-lg -top-2 left-8 animate-fade-in">
+                      <div 
+                        id="crosscutting-tooltip"
+                        role="tooltip"
+                        className="absolute z-50 w-80 p-4 bg-white border border-gray-300 rounded-lg shadow-lg -top-2 left-8 animate-fade-in"
+                      >
                         <div className="text-sm text-gray-900">
                           <h4 className="font-semibold mb-2 text-gray-900">Cross-Cutting Impact Analysis</h4>
                           <p className="mb-3 text-gray-800">
@@ -898,11 +922,11 @@ export default function Analysis() {
                             <strong className="text-gray-900">Severity levels:</strong>
                           </p>
                           <ul className="list-disc list-inside mb-3 space-y-1 text-gray-700 ml-4">
-                            <li className="text-gray-600"><strong>MINIMAL (0-1):</strong> Limited cross-agency impact</li>
-                            <li className="text-green-600"><strong>LOW (2-3):</strong> Minor overlap concerns</li>
-                            <li className="text-yellow-600"><strong>MODERATE (4-5):</strong> Significant coordination needed</li>
-                            <li className="text-orange-600"><strong>HIGH (6-10):</strong> Complex inter-agency effects</li>
-                            <li className="text-red-600"><strong>CRITICAL (11+):</strong> Major bureaucratic entanglement</li>
+                            <li className="text-gray-800 dark:text-gray-200"><strong>MINIMAL (0-1):</strong> Limited cross-agency impact</li>
+                            <li className="text-green-700 dark:text-green-400"><strong>LOW (2-3):</strong> Minor overlap concerns</li>
+                            <li className="text-yellow-700 dark:text-yellow-400"><strong>MODERATE (4-5):</strong> Significant coordination needed</li>
+                            <li className="text-orange-700 dark:text-orange-400"><strong>HIGH (6-10):</strong> Complex inter-agency effects</li>
+                            <li className="text-red-700 dark:text-red-400"><strong>CRITICAL (11+):</strong> Major bureaucratic entanglement</li>
                           </ul>
                           <p className="text-gray-700">
                             <strong className="text-gray-900">Why it matters:</strong> Higher scores indicate regulations requiring coordinated reform efforts and potential sources of bureaucratic inefficiency.
@@ -916,21 +940,21 @@ export default function Analysis() {
                   </div>
                 </div>
                 <p className={`text-4xl font-bold mb-2 ${
-                  crossCuttingSeverity.level === 'MINIMAL' ? 'text-gray-600' :
-                  crossCuttingSeverity.level === 'LOW' ? 'text-green-600' :
-                  crossCuttingSeverity.level === 'MODERATE' ? 'text-yellow-600' :
-                  crossCuttingSeverity.level === 'HIGH' ? 'text-orange-600' :
-                  'text-red-600'
+                  crossCuttingSeverity.level === 'MINIMAL' ? 'text-gray-800 dark:text-gray-200' :
+                  crossCuttingSeverity.level === 'LOW' ? 'text-green-700 dark:text-green-400' :
+                  crossCuttingSeverity.level === 'MODERATE' ? 'text-yellow-700 dark:text-yellow-400' :
+                  crossCuttingSeverity.level === 'HIGH' ? 'text-orange-700 dark:text-orange-400' :
+                  'text-red-700 dark:text-red-400'
                 }`} aria-label={`Cross-cutting severity score: ${crossCuttingSeverity.score}, ${crossCuttingSeverity.level.toLowerCase()} severity level`}>
                   {crossCuttingSeverity.score}
                 </p>
                 <p className="text-sm text-muted-foreground mb-1">
                   Severity: <span className={`font-semibold ${
-                    crossCuttingSeverity.level === 'MINIMAL' ? 'text-gray-600' :
-                    crossCuttingSeverity.level === 'LOW' ? 'text-green-600' :
-                    crossCuttingSeverity.level === 'MODERATE' ? 'text-yellow-600' :
-                    crossCuttingSeverity.level === 'HIGH' ? 'text-orange-600' :
-                    'text-red-600'
+                    crossCuttingSeverity.level === 'MINIMAL' ? 'text-gray-800 dark:text-gray-200' :
+                    crossCuttingSeverity.level === 'LOW' ? 'text-green-700 dark:text-green-400' :
+                    crossCuttingSeverity.level === 'MODERATE' ? 'text-yellow-700 dark:text-yellow-400' :
+                    crossCuttingSeverity.level === 'HIGH' ? 'text-orange-700 dark:text-orange-400' :
+                    'text-red-700 dark:text-red-400'
                   }`}>{crossCuttingSeverity.level}</span>
                 </p>
                 <p className="text-sm text-muted-foreground">

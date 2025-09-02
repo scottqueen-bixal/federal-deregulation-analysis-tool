@@ -215,6 +215,7 @@ export default function AgencyCombobox({
         className="w-full p-4 bg-input border border-border rounded-md text-foreground focus:outline-none focus:ring-[3px] focus:ring-ring focus:border-transparent transition-all duration-200 font-medium flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
         aria-expanded={isOpen}
         aria-haspopup="listbox"
+        aria-describedby="agency-combobox-description"
       >
         <span className="truncate">
           {loading
@@ -230,10 +231,18 @@ export default function AgencyCombobox({
           }`}
         />
       </button>
+      
+      <div id="agency-combobox-description" className="sr-only">
+        Use arrow keys to navigate options, Enter to select, Escape to close
+      </div>
 
       {/* Dropdown */}
       {isOpen && (
-        <div className="absolute z-50 w-full mt-2 bg-white dark:bg-gray-800 border border-border rounded-md shadow-lg max-h-96 overflow-hidden">
+        <div 
+          className="absolute z-50 w-full mt-2 bg-white dark:bg-gray-800 border border-border rounded-md shadow-lg max-h-96 overflow-hidden"
+          role="listbox"
+          aria-labelledby="agency-combobox"
+        >
           {/* Search Input */}
           <div className="p-3 border-b border-border bg-white dark:bg-gray-800">
             <div className="relative">
@@ -248,6 +257,8 @@ export default function AgencyCombobox({
                 }}
                 placeholder="Search agencies..."
                 className="w-full pl-10 pr-4 py-2 bg-white dark:bg-gray-700 border border-input rounded-md text-sm focus:outline-none focus:ring-[3px] focus:ring-ring text-foreground"
+                aria-label="Search agencies"
+                role="searchbox"
               />
             </div>
           </div>
