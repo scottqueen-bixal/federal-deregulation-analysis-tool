@@ -12,9 +12,14 @@ npx prisma migrate deploy
 echo "Generating Prisma client..."
 npx prisma generate
 
-echo "Starting data ingestion..."
-# npm run ingest -- --max-agencies=10
-npm run ingest:all
+# Only run ingestion if RUN_INGESTION is set to true
+if [ "$RUN_INGESTION" = "true" ]; then
+    echo "RUN_INGESTION is set to true - Starting data ingestion..."
+    # npm run ingest -- --max-agencies=10
+    npm run ingest:all
+else
+    echo "Skipping data ingestion (RUN_INGESTION not set to true)"
+fi
 
 echo "Starting Next.js development server..."
 npm run dev

@@ -1,0 +1,6 @@
+services:
+  nextjs:
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/ecfr
+      - RUN_INGESTION=true

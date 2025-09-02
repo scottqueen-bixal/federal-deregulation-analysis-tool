@@ -17,23 +17,35 @@ cd federal-deregulation-analysis-tool
 npm install
 ```
 
-2. **Start the database:**
+2. **For development without ingestion:**
+```bash
+docker-compose up --build
+```
+
+3. **For full setup with data ingestion:**
+```bash
+docker-compose -f docker-compose.yml -f docker-compose.build.yml up --build
+```
+
+**Alternative local setup:**
+
+1. **Start the database:**
 ```bash
 docker-compose up -d postgres
 ```
 
-3. **Setup the database schema:**
+2. **Setup the database schema:**
 ```bash
 npm run db:migrate
 npm run db:generate
 ```
 
-4. **Ingest data (optional - for testing with limited data):**
+3. **Ingest data (optional - for testing with limited data):**
 ```bash
 npm run ingest:test
 ```
 
-5. **Start the development server:**
+4. **Start the development server:**
 ```bash
 npm run dev
 ```
@@ -118,6 +130,28 @@ npm run ingest       # Full data ingestion from eCFR APIs
 npm run ingest:test  # Limited ingestion (2 agencies) for testing
 npm run ingest:all   # Complete data ingestion (all agencies)
 ```
+
+### Docker Usage
+
+**For regular development (no ingestion):**
+```bash
+docker-compose up --build
+```
+
+**For full setup with data ingestion:**
+```bash
+docker-compose -f docker-compose.yml -f docker-compose.build.yml up --build
+```
+
+**To rebuild containers without ingestion:**
+```bash
+docker-compose down
+docker-compose up --build
+```
+
+The ingestion process is controlled by the `RUN_INGESTION` environment variable:
+- Set to `false` (default) - skips data ingestion for faster startup
+- Set to `true` (via docker-compose.build.yml) - runs full data ingestion
 
 ### Data Ingestion Process
 
