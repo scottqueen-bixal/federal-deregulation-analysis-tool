@@ -1,6 +1,7 @@
 {
   "name": "federal-deregulation-analysis-tool",
   "version": "0.1.0",
+  "author": "gscottqueen",
   "private": true,
   "type": "module",
   "scripts": {
@@ -16,11 +17,6 @@
     "test:performance": "jest --testPathPatterns=performance",
     "test:integration": "jest --testPathPatterns=integration",
     "test:verbose": "jest --verbose",
-    "test:legacy:api": "node src/__tests__/test-api-routes.js",
-    "test:legacy:load": "node src/__tests__/test-load.js",
-    "test:legacy:individual": "node src/__tests__/test-individual.js",
-    "test:legacy:runner": "node src/__tests__/test-runner.js",
-    "test:quick": "node src/__tests__/quick-test.js",
     "ingest": "tsx src/scripts/ingest.ts",
     "ingest:test": "tsx src/scripts/ingest.ts -- --max-agencies=2",
     "ingest:all": "tsx src/scripts/ingest.ts",
