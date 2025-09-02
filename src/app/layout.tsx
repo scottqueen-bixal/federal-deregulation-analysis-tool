@@ -15,6 +15,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Federal Deregulation Analysis Tool",
   description: "A tool for analyzing federal deregulation efforts",
+  icons: {
+    icon: '/favicon.svg',
+  },
 };
 
 export default function RootLayout({
