@@ -122,16 +122,20 @@ export default React.memo(function AgencyCombobox({
   }, [agencies]);
 
   // Filter agencies based on search term
-  const filteredGroups = useMemo(() =>
-    groupedAgencies.map(group => ({
+  const filteredGroups = useMemo(() => {
+    // If search term is empty, return all agencies
+    if (searchTerm.trim() === '') {
+      return groupedAgencies;
+    }
+    
+    return groupedAgencies.map(group => ({
       ...group,
       agencies: group.agencies.filter(agency =>
         agency.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         agency.slug.toLowerCase().includes(searchTerm.toLowerCase())
       )
-    })).filter(group => group.agencies.length > 0),
-    [groupedAgencies, searchTerm]
-  );
+    })).filter(group => group.agencies.length > 0);
+  }, [groupedAgencies, searchTerm]);
 
   // Get all filtered agencies for keyboard navigation
   const allFilteredAgencies = useMemo(() =>

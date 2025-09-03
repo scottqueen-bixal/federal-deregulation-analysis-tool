@@ -8,9 +8,8 @@ A comprehensive Next.js application for analyzing federal regulations from the E
 For the smoothest onboarding experience, we recommend using our AI agent setup guide with **Claude Sonnet 4** in GitHub Copilot:
 
 1. **Open the agent prompt**: `getting-started.prompt.md`
-2. **Use with Claude Sonnet 4**: Copy the entire prompt into Claude or GitHub Copilot
-3. **Interactive guidance**: The AI will walk you through each step with personalized troubleshooting
-4. **Comprehensive setup**: Covers setup, data ingestion, testing, and feature exploration
+2. **Interactive guidance**: The AI will walk you through each step with personalized troubleshooting
+3. **Comprehensive setup**: Covers setup, data ingestion, testing, and feature exploration
 
 This approach provides interactive guidance, real-time troubleshooting, and helps you understand the federal regulation analysis domain.
 
