@@ -9,7 +9,9 @@
     "^.+\\.(ts|tsx)$": ["ts-jest", {
       "useESM": true
     }],
-    "^.+\\.(js|jsx)$": "babel-jest"
+    "^.+\\.(js|jsx)$": ["babel-jest", {
+      "presets": [["@babel/preset-env", { "targets": { "node": "current" } }]]
+    }]
   },
   "testMatch": [
     "**/src/__tests__/**/*.test.{js,ts}",
