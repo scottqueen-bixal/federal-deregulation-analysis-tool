@@ -93,7 +93,6 @@ All endpoints support JSON responses with comprehensive error handling and cachi
 - `GET /api/analysis/complexity_score/agency/[agencyId]` - Complexity scoring with relative percentile ranking
 - `GET /api/analysis/complexity_score/max-cached` - Maximum complexity score (cached for performance)
 - `GET /api/analysis/complexity_score/max-aggregated` - Aggregated maximum complexity calculation
-- `GET /api/analysis/cross-cutting/` - Cross-cutting regulatory analysis with impact levels
 - `GET /api/analysis/cross-cutting/agency/[agencyId]` - Agency-specific cross-cutting analysis with severity scoring
 
 #### Debug Endpoints
